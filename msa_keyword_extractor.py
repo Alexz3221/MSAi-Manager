@@ -29,10 +29,11 @@ def parse_msa_file(filepath):
     }
 
 # Loop through your files
-# parsed_data = [parse_msa_file(f) for f in glob.glob("*.txt")] 
-
-def main():
-    print(":)") 
+# parsed_data = [parse_msa_file(f) for f in glob.glob("*.txt")]  
 
 if __name__ == "__main__":
-    main()
+    # Running format would be "python3 msa_parser.py <filename> <filename> <filename> ..."
+    # Loop through files and sort them in priority.
+    # Write them out to another big file. 
+    
+
