@@ -1,0 +1,8 @@
+Company: Oracle
+Primary contact: legal-contact+oracle@example.com
+
+Pretend discovered Google Cloud usage:
+- Apigee API management for partner integrations
+- Apigee native MCP serving for automation and tool endpoints
+- Cloud Functions for integration glue code and callbacks
+- Compute Engine for compatibility testing workloads

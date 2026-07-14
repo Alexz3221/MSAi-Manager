@@ -1,0 +1,8 @@
+Company: Apple
+Primary contact: legal-contact+apple@example.com
+
+Pretend discovered Google Cloud usage:
+- Cloud Storage buckets for application assets and analytics exports
+- BigQuery datasets for aggregated product telemetry analysis
+- Cloud Functions for event-driven internal workflow automation
+- Compute Engine instances for legacy service workloads
