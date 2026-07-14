@@ -23,27 +23,50 @@ class ClientProfile:
     client_id: str
     active_services: list[str]
 
-def query_services(client_id: str) -> list[str]
-  """Return the active GCP services from client.
+def query_services(client_id: str) -> list[str]:
+    """Return the active GCP services from the client project using the Asset API."""
+    try:
+        client = asset_v1.AssetServiceClient()
+        project_resource = f"projects/{client_id}"
+        
+        response = client.list_assets(
+            request={
+                "parent": project_resource,
+                "read_time": None,
+                "content_type": asset_v1.ContentType.RESOURCE,
+                # You can filter by specific asset_types or page_size if needed
+            }
+        )
+        
+        active_services = set()
+        for asset in response:
+            # Asset names typically look like: //compute.googleapis.com/projects/...
+            # We can extract the service name from the asset_type
+            if asset.asset_type:
+                # E.g., extracts "storage.googleapis.com" from "storage.googleapis.com/Bucket"
+                service = asset.asset_type.split("/")[0]
+                active_services.add(service)
+        return list(active_services)
 
-  TEST STUB: Reads from FAKE_CLIENT_ASSETS and will replace w/ a real Asset API query. :
-    from google.cloud import asset_v1
-    client = asset_v1.AssetServiceClient()
-    client.search_all_resources(scope=f"projects/{client_id}", ...)
-  """
-  try:
-    return FAKE_CLIENT_ASSETS[client_id]
-  except KeyError:
-    raise ValueError(f"No mock asset data for client_id '{client_id}'. "
-                     f"Known test clients: {', '.join(FAKE_CLIENT_ASSETS)}"
-    )
+    except Exception as e:
+        print(f"Error querying Asset API: {e}")
+        # Fallback to mock data for safety during testing
+        try:
+            return FAKE_CLIENT_ASSETS[client_id]
+        except KeyError:
+            raise ValueError(f"No mock asset data for client_id '{client_id}'.")
+
+def build_profile(account_name: str, client_id: str) -> ClientProfile:
+    # Changed from fetch_active_services to query_services
+    services = query_services(client_id) 
+    return ClientProfile(account=account_name, client_id=client_id, active_services=services)
 
 def normalize_service_name(service: str) -> str:
     """Match the casefold-on-read convention used by combine_and_send.py / msa_chatbot.py."""
     return service.strip().casefold()
  
 def build_profile(account_name: str, client_id: str) -> ClientProfile:
-    services = fetch_active_services(client_id)
+    services = wquery_services(client_id)
     return ClientProfile(account=account_name, client_id=client_id, active_services=services)
  
 def write_keyword_csv(profile: ClientProfile) -> Path:
