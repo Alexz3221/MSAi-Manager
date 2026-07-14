@@ -17,6 +17,17 @@ FAKE_CLIENT_ASSETS: dict[str, list[str]] = {
     "initech": ["BigQuery", "Vertex AI", "Pub/Sub"],
 }
 
+# Maps raw GCP Asset API service names to user-friendly keywords
+API_TO_KEYWORD_MAP: dict[str, str] = {
+    "storage.googleapis.com": "cloud storage",
+    "bigquery.googleapis.com": "bigquery",
+    "compute.googleapis.com": "compute engine",
+    "cloudfunctions.googleapis.com": "cloud functions",
+    "container.googleapis.com": "google kubernetes engine",
+    "pubsub.googleapis.com": "pub/sub",
+    "aiplatform.googleapis.com": "vertex ai",
+}
+
 @dataclass(frozen=True)
 class ClientProfile:
     account: str
@@ -44,7 +55,9 @@ def query_services(client_id: str) -> list[str]:
             # We can extract the service name from the asset_type
             if asset.asset_type:
                 # E.g., extracts "storage.googleapis.com" from "storage.googleapis.com/Bucket"
-                service = asset.asset_type.split("/")[0]
+                service_api_name = asset.asset_type.split("/")[0]
+                # Map to the friendly keyword if known, otherwise fallback to the raw service api name
+                service = API_TO_KEYWORD_MAP.get(service_api_name, service_api_name)
                 active_services.add(service)
         return list(active_services)
 
