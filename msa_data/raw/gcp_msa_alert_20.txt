@@ -1,0 +1,30 @@
+Subject: Action Required: Cloud Functions Node.js 14 Runtime End of Support
+From: The Google Cloud Team
+Date: February 16, 2026
+
+You are receiving this message because you have one or more Google Cloud Functions currently deployed using the Node.js 14 runtime.
+
+WHAT YOU NEED TO KNOW
+The Node.js open-source community has officially ended support for Node.js 14. Consequently, Google Cloud will end support for the Node.js 14 runtime environment in Cloud Functions.
+
+Starting May 07, 2026, you will no longer be able to deploy new functions or update existing functions using the Node.js 14 runtime. 
+By June 04, 2026, Google will no longer apply security patches to the Node.js 14 underlying OS, and functions may be disabled if a critical vulnerability is discovered.
+
+WHAT YOU NEED TO DO
+Action advised before May 07, 2026:
+1. Review your deployed functions in the Google Cloud Console.
+2. Upgrade your code to be compatible with Node.js 20 or later.
+3. Redeploy your functions specifying the new runtime (e.g., `--runtime nodejs20`). 
+
+Please review the migration guide in the Cloud Functions documentation for details on breaking changes between Node.js 14 and newer versions.
+
+IMPACTED CUSTOMERS/ACCOUNTS
+Your affected projects are listed below:
+frontend-app-289702
+ml-training-pipeline-662107
+
+WE'RE HERE TO HELP
+If you have any questions or require assistance, please contact Google Cloud Support.
+
+Thanks for choosing Google Cloud.
+– The Google Cloud Team

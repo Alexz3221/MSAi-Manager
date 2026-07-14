@@ -1,0 +1,29 @@
+Subject: [Mandatory Service Announcement] Upcoming Apigee MCP Status Code Updates
+From: The Google Cloud Team
+Date: May 16, 2026
+
+You’re receiving this communication because we have identified that your organization is using Apigee’s native serving capabilities for Model Context Protocol (MCP). We are updating how MCP endpoints return HTTP status codes for tool-call errors and OAuth metadata.
+
+This change brings Apigee MCP into alignment with the MCP specification. You can safely ignore this message if you were neither using Apigee’s native MCP server, nor have ever built custom error handling logic.
+
+WHAT YOU NEED TO KNOW
+To ensure standard compliance, we are updating specific endpoint responses globally between July 22, 2026, and August 01, 2026. This change only impacts the specific highlighted changes detailed below and will not impact any other traffic. Please review your systems to ensure readiness before July 22, 2026.
+
+Key changes:
+* Error handling for tool execution errors on tools/call: Previously returned 4xx/5xx status codes; they will now return HTTP 200 with result.isError: true in the response body.
+* Lack of a configured OAuth Protected Resource Metadata (PRM) endpoint: Missing metadata at /.well-known/oauth-protected-resource previously returned HTTP 500. It will now return HTTP 404.
+
+WHAT YOU NEED TO DO
+Action advised before July 22, 2026:
+1. Verify if your deployments are impacted: Before the rollout begins, you can review your Apigee access logs or Cloud Logging for any non-2xx responses on your /mcp endpoint traffic.
+2. Take action based on your setup: Update your client-side workarounds to expect standard HTTP 200 and parse `result.isError`.
+
+IMPACTED CUSTOMERS/ACCOUNTS
+Your affected projects are listed below:
+auth-gateway-625834
+
+WE'RE HERE TO HELP
+If you have any questions or require assistance, please contact Google Cloud Support.
+
+Thanks for choosing Google Cloud.
+– The Google Cloud Team

@@ -1,0 +1,30 @@
+Subject: [Legal Notice] Action Required: Deprecation of Legacy Access Control Lists (ACLs) for Cloud Storage
+From: The Google Cloud Team
+Date: March 09, 2026
+
+You are receiving this communication because your organization has Google Cloud Storage buckets utilizing Legacy Access Control Lists (ACLs) rather than uniform bucket-level access.
+
+WHAT YOU NEED TO KNOW
+To improve security, simplify permissions, and align with the Cloud Data Processing Addendum (CDPA), Google Cloud is migrating all remaining Cloud Storage buckets to use Identity and Access Management (IAM) exclusively.
+
+Between May 05, 2026 and May 29, 2026, Google Cloud will forcefully enable "Uniform bucket-level access" on all buckets listed in your affected projects. 
+
+Key Changes:
+* Any granular, object-level ACLs currently applied to individual files within your buckets will be permanently disabled and ignored.
+* Access will be governed strictly by bucket-level or project-level IAM roles.
+
+WHAT YOU NEED TO DO
+Action advised before May 05, 2026:
+1. Review the IAM permissions on your affected buckets.
+2. Ensure that any service accounts, users, or external services that rely on object-level ACLs have been granted equivalent roles (e.g., `roles/storage.objectViewer`) at the bucket level.
+3. Enable "Uniform bucket-level access" manually ahead of the deadline to test your application's behavior and ensure no disruption to your services.
+
+IMPACTED CUSTOMERS/ACCOUNTS
+Your affected projects are listed below:
+backend-services-337670
+
+WE'RE HERE TO HELP
+If you have any questions or require assistance, please contact Google Cloud Support.
+
+Thanks for choosing Google Cloud.
+– The Google Cloud Team
