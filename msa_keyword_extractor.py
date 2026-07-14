@@ -1,5 +1,7 @@
 import re   # REGEX
 import glob
+import sys
+import os
 
 def parse_msa_file(filepath):
     with open(filepath, 'r') as file:
@@ -36,4 +38,7 @@ if __name__ == "__main__":
     # Loop through files and sort them in priority.
     # Write them out to another big file. 
     
+    if (len(sys.argv)) < 2:
+        print("Please run with at least one MSA file.")
+
 
