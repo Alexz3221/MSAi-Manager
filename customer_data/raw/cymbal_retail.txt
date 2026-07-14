@@ -1,0 +1,8 @@
+Company: Cymbal Retail
+Primary contact: legal-contact+cymbal_retail@example.com
+
+Pretend discovered Google Cloud usage:
+- Cloud Storage buckets for catalog assets and order exports
+- Compute Engine workloads for legacy checkout services
+- Cloud Functions functions deployed with older Node.js runtimes
+- BigQuery datasets for sales analytics

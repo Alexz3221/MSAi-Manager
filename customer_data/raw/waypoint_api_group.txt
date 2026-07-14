@@ -1,0 +1,7 @@
+Company: Waypoint API Group
+Primary contact: legal-contact+waypoint_api_group@example.com
+
+Pretend discovered Google Cloud usage:
+- Apigee API proxies for partner integrations
+- Apigee native MCP serving for internal automation tools
+- Cloud Functions handlers for webhook processing
