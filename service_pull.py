@@ -65,10 +65,6 @@ def normalize_service_name(service: str) -> str:
     """Match the casefold-on-read convention used by combine_and_send.py / msa_chatbot.py."""
     return service.strip().casefold()
  
-def build_profile(account_name: str, client_id: str) -> ClientProfile:
-    services = wquery_services(client_id)
-    return ClientProfile(account=account_name, client_id=client_id, active_services=services)
- 
 def write_keyword_csv(profile: ClientProfile) -> Path:
     """Write one service per row - matches read_keywords() in combine_and_send.py."""
     CUSTOMER_KEYWORDS_DIR.mkdir(parents=True, exist_ok=True)
