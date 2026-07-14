@@ -4,6 +4,8 @@ import csv
 from dataclasses import dataclass
 from pathlib import Path
 
+from google.cloud import asset_v1 # tbd on this, but API is active now
+
 ROOT = Path(__file__).parent
 CUSTOMER_RAW_DIR = ROOT / "customer_data" / "raw"
 CUSTOMER_KEYWORDS_DIR = ROOT / "customer_data" / "customer_keywords_cleaned"
