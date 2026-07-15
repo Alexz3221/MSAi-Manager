@@ -1,0 +1,29 @@
+Date: Tue, Jun 23, 2026 at 9:58 AM
+Subject: [Internal MSA Notification] [Action Required] Upgrade Cloud Composer 2 environments before Jan 31, 2027
+
+Hello,
+
+You are receiving this internal announcement email as you are subscribed to the cloud-product-notifications-announce Google group.
+
+TLDR: Composer 2 enters end of full support. Inform customers of the Composer 3 upgrade path and the in-place upgrade tooling so they can plan DAG validation windows.
+
+This communication has received final stakeholder approval and is scheduled for distribution on July 6, 2026.
+
+Please do not forward this email or the document linked directly to customers as it may contain some internal links or sensitive details.
+
+Key Details:
+MSA Bug ID	b/497552310
+Launch Owner	agarciam - agarciam@google.com
+MSA Doc	MSA Doc Link
+MSA Approvals	Approvals: Turbo Link
+Message Target Audience	
+The recipient list for this MSA communications was determined by agarciam.
+Internal Audience
+External Audience
+Project Owners
+Project Org Admins
+Customer MSA Subject	[Action Required] Upgrade Cloud Composer 2 environments before Jan 31, 2027
+Does this message require customers to take action, and could that action lead to cost implications?	Yes
+Are Reminder MSAs planned for this notification?	Yes
+Planned Reminder Dates, if known	Reminder 1: October 1, 2026
+Reminder 2: December 1, 2026

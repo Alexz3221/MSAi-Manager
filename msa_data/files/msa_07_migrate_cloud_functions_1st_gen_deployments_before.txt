@@ -1,0 +1,30 @@
+Date: Wed, Jun 24, 2026 at 1:16 PM
+Subject: [Internal MSA Notification] [Action Required] Migrate Cloud Functions 1st gen deployments before Mar 31, 2027
+
+Hello,
+
+You are receiving this internal announcement email as you are subscribed to the cloud-product-notifications-announce Google group.
+
+TLDR: 1st gen Cloud Functions will stop accepting new deployments. Desired outcome is that customers redeploy on 2nd gen (Cloud Run functions) and validate concurrency and timeout behavior changes.
+
+This communication has received final stakeholder approval and is scheduled for distribution on July 8, 2026.
+
+Please do not forward this email or the document linked directly to customers as it may contain some internal links or sensitive details.
+
+Key Details:
+MSA Bug ID	b/468920541
+Launch Owner	tvasquez - tvasquez@google.com
+MSA Doc	MSA Doc Link
+MSA Approvals	Approvals: Turbo Link
+Message Target Audience	
+The recipient list for this MSA communications was determined by tvasquez.
+Internal Audience
+External Audience
+Project Owners
+Billing Admins
+Customer MSA Subject	[Action Required] Migrate Cloud Functions 1st gen deployments before Mar 31, 2027
+Does this message require customers to take action, and could that action lead to cost implications?	Yes
+Are Reminder MSAs planned for this notification?	Yes
+Planned Reminder Dates, if known	Reminder 1: November 2, 2026
+Reminder 2: January 15, 2027
+Reminder 3: March 2, 2027

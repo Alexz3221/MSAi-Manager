@@ -1,0 +1,27 @@
+Date: Fri, Jun 19, 2026 at 4:21 PM
+Subject: [Internal MSA Notification] [Action Advised] Review Cloud Run default ingress settings changing Sep 15, 2026
+
+Hello,
+
+You are receiving this internal announcement email as you are subscribed to the cloud-product-notifications-announce Google group.
+
+TLDR: New Cloud Run services will default to internal-and-load-balancer ingress. Existing services are unaffected. Outcome: customers with IaC templates that rely on the old default update them before rollout.
+
+This communication has received final stakeholder approval and is scheduled for distribution on July 6, 2026.
+
+Please do not forward this email or the document linked directly to customers as it may contain some internal links or sensitive details.
+
+Key Details:
+MSA Bug ID	b/510442776
+Launch Owner	ekwon - ekwon@google.com
+MSA Doc	MSA Doc Link
+MSA Approvals	Approvals: Turbo Link
+Message Target Audience	
+The recipient list for this MSA communications was determined by ekwon.
+Internal Audience
+External Audience
+Project Owners
+Customer MSA Subject	[Action Advised] Review Cloud Run default ingress settings changing Sep 15, 2026
+Does this message require customers to take action, and could that action lead to cost implications?	No
+Are Reminder MSAs planned for this notification?	No
+Planned Reminder Dates, if known	No Reminder Dates

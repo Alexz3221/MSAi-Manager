@@ -1,0 +1,27 @@
+Date: Fri, Jun 26, 2026 at 8:41 AM
+Subject: [Internal MSA Notification] [Pricing Update] Cloud NAT will move to per-gateway hourly billing on Nov 1, 2026
+
+Hello,
+
+You are receiving this internal announcement email as you are subscribed to the cloud-product-notifications-announce Google group.
+
+TLDR: Notify customers that we are restructuring Cloud NAT SKUs. Most customers will see no material change; high-gateway-count projects may see an increase.
+
+This communication has received final stakeholder approval and is scheduled for distribution on July 10, 2026.
+
+Please do not forward this email or the document linked directly to customers as it may contain some internal links or sensitive details.
+
+Key Details:
+MSA Bug ID	b/520118934
+Launch Owner	ykondo - ykondo@google.com
+MSA Doc	MSA Doc Link
+MSA Approvals	Approvals: Turbo Link
+Message Target Audience	
+The recipient list for this MSA communications was determined by ykondo.
+External Audience
+Project Owners
+Billing Admins
+Customer MSA Subject	[Pricing Update] Cloud NAT will move to per-gateway hourly billing on Nov 1, 2026
+Does this message require customers to take action, and could that action lead to cost implications?	Yes
+Are Reminder MSAs planned for this notification?	No
+Planned Reminder Dates, if known	No Reminder Dates

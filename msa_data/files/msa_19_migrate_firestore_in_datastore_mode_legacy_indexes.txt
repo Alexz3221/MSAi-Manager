@@ -1,0 +1,109 @@
+Date: Mon, Jul 13, 2026 at 10:26 AM
+Subject: [Account Team MSA Notification] [Action Required] Migrate Firestore in Datastore mode legacy indexes before Dec 31, 2026
+
+Hello Account Teams,
+
+TLDR: To inform customers that legacy composite index definitions will no longer be honored and that they must re-declare indexes using the current index configuration format.
+
+Your customers listed below will receive a version of the following notification on July 27, 2026. The version below may undergo additional edits. To view the most up-to-date version, please refer to the Communications doc. Support resources here: go/model-migrations.
+
+Please do not forward this email or the document linked above directly to your customers as it may contain some internal links or sensitive details. Please extract and share any relevant information separately.
+
+Key details:
+
+MSA Bug ID	b/493607285
+Launch Owner	asundaram - asundaram@google.com
+
+Message Target Audience
+
+The recipient list filters chosen for this MSA communication were determined by asundaram.
+
+Audience:
+Internal (@google.com addresses)
+External (non @google.com addresses)
+Recipients:
+Project Owners
+Project Org. Admins
+Essential Contacts:
+Technical
+
+Customer MSA Subject
+
+[Action Required] Migrate Firestore in Datastore mode legacy indexes before Dec 31, 2026
+
+Does this notification require proactive TAM follow up with customers?
+
+No
+
+Does this message require customers to take action?
+
+Yes
+
+Could that action taken by customers lead to cost implications?
+
+No
+
+Are Reminder MSAs planned for this notification?
+
+Yes
+
+Planned Reminder Dates, if known
+
+Reminder 1: September 28, 2026
+Reminder 2: November 30, 2026
+
+Is there a hard deadline for customers to complete specific action items?
+
+Yes
+
+December 31, 2026
+
+Action items for Account Teams:
+
+If the affected customers below are not your customers, please contact the appropriate role-based alias to update the customer database. If you're no longer in this role, please forward this message to your backfill.
+After the MSA is sent, use go/msa-vault to review the customer email addresses that received the MSA. Refer to go/cloud-msa-vault for more information.
+
+List of your affected customers:
+
+Ingram Micro Inc.
+Broadcom Corporation
+Concordance Inc.
+SADA Systems LLC
+
+Thank you for your attention to these details. If you have questions/feedback about the MSA process, please share it at go/msa-questions.
+
+Customer message:
+
+Hello Firestore customer,
+
+You are receiving this communication because one or more of your projects use legacy composite index definitions in Datastore mode.
+
+Legacy index definitions will no longer be honored after December 31, 2026. Queries that depend on them will begin returning errors.
+
+What you need to know
+
+Key change: Legacy composite index definitions stop being honored on December 31, 2026.
+
+Impacted customers/accounts:
+
+Your affected projects are listed below:
+
+${project.project_id}
+
+What you need to do
+
+Action required before December 31, 2026:
+
+Export your current index definitions: Use the gcloud CLI to list indexes in the affected projects.
+Re-declare indexes: Convert your definitions to the current index.yaml format and deploy them.
+Validate queries: Confirm that your query paths resolve against the newly built indexes before removing the old definitions.
+
+We're here to help
+
+Review the index configuration documentation for the current format.
+
+If you have any questions or need help, contact Google Cloud Support.
+
+Thanks for choosing Firestore.
+
+- The Google Cloud Team
