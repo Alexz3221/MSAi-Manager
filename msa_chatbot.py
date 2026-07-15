@@ -188,6 +188,18 @@ def first_paragraph(lines: list[str], max_lines: int = 3) -> str:
     return " ".join(paragraph) if paragraph else "No summary available."
 
 
+def raw_summary(raw_text: str) -> str:
+    know_section = first_paragraph(section_lines(raw_text, "WHAT YOU NEED TO KNOW"))
+    if know_section != "No summary available.":
+        return know_section
+
+    for line in raw_text.splitlines():
+        if line.startswith("TLDR:"):
+            return line.removeprefix("TLDR:").strip()
+
+    return "No summary available."
+
+
 def action_items(lines: list[str], max_items: int = 3) -> list[str]:
     actions = [
         line
@@ -294,7 +306,7 @@ def build_matches(company_name: str) -> list[MsaMatch]:
                 effective_date=msa_profile.effective_date,
                 requires_customer_action=msa_profile.requires_customer_action,
                 matching_services=matching_services,
-                summary=first_paragraph(section_lines(raw_text, "WHAT YOU NEED TO KNOW")),
+                summary=raw_summary(raw_text),
                 actions=action_items(section_lines(raw_text, "WHAT YOU NEED TO DO")),
                 raw_msa_path=msa_profile.raw_msa_path,
             )
@@ -360,7 +372,7 @@ def build_feed(
                 requires_customer_action=msa_profile.requires_customer_action,
                 affected_services=sorted(msa_profile.affected_services),
                 impacted_companies=impacts,
-                summary=first_paragraph(section_lines(raw_text, "WHAT YOU NEED TO KNOW")),
+                summary=raw_summary(raw_text),
                 actions=action_items(section_lines(raw_text, "WHAT YOU NEED TO DO")),
                 raw_msa_path=msa_profile.raw_msa_path,
             )
