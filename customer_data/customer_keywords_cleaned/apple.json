@@ -1,0 +1,46 @@
+{
+  "company_id": "apple",
+  "company_name": "Apple",
+  "contacts": [
+    "legal-contact+apple@example.com"
+  ],
+  "raw_customer_path": "customer_data/raw/apple.txt",
+  "services": [
+    {
+      "name": "cloud storage",
+      "aliases": [
+        "gcs",
+        "google cloud storage"
+      ],
+      "confidence": 0.92,
+      "source": "customer_data/raw/apple.txt"
+    },
+    {
+      "name": "bigquery",
+      "aliases": [
+        "bq",
+        "google bigquery"
+      ],
+      "confidence": 0.89,
+      "source": "customer_data/raw/apple.txt"
+    },
+    {
+      "name": "cloud functions",
+      "aliases": [
+        "google cloud functions",
+        "functions"
+      ],
+      "confidence": 0.86,
+      "source": "customer_data/raw/apple.txt"
+    },
+    {
+      "name": "compute engine",
+      "aliases": [
+        "gce",
+        "google compute engine"
+      ],
+      "confidence": 0.81,
+      "source": "customer_data/raw/apple.txt"
+    }
+  ]
+}

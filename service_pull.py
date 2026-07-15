@@ -1,6 +1,6 @@
 from __future__ import annotations
 import argparse
-import csv
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -78,15 +78,26 @@ def normalize_service_name(service: str) -> str:
     """Match the casefold-on-read convention used by combine_and_send.py / msa_chatbot.py."""
     return service.strip().casefold()
  
-def write_keyword_csv(profile: ClientProfile) -> Path:
-    """Write one service per row - matches read_keywords() in combine_and_send.py."""
+def write_keyword_json(profile: ClientProfile) -> Path:
+    """Write a structured cleaned customer profile for feed matching."""
     CUSTOMER_KEYWORDS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = CUSTOMER_KEYWORDS_DIR / f"{profile.account}.csv"
- 
-    with out_path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        for service in profile.active_services:
-            writer.writerow([normalize_service_name(service)])
+    out_path = CUSTOMER_KEYWORDS_DIR / f"{profile.account}.json"
+    payload = {
+        "company_id": profile.account,
+        "company_name": profile.account.replace("_", " ").title(),
+        "contacts": [f"legal-contact+{profile.account}@example.com"],
+        "raw_customer_path": f"customer_data/raw/{profile.account}.txt",
+        "services": [
+            {
+                "name": normalize_service_name(service),
+                "aliases": [],
+                "confidence": 1.0,
+                "source": f"customer_data/raw/{profile.account}.txt",
+            }
+            for service in profile.active_services
+        ],
+    }
+    out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
  
     return out_path
  
@@ -106,12 +117,12 @@ def write_raw_profile(profile: ClientProfile) -> Path:
     return out_path
  
 def generate_test_fixtures() -> None:
-    """Generate CSV + raw files for every test client, for a quick pipeline test."""
+    """Generate JSON + raw files for every test client, for a quick pipeline test."""
     for client_id in FAKE_CLIENT_ASSETS:
         profile = build_profile(account_name=client_id, client_id=client_id)
-        csv_path = write_keyword_csv(profile)
+        json_path = write_keyword_json(profile)
         raw_path = write_raw_profile(profile)
-        print(f"{profile.account}: wrote {csv_path.name} and {raw_path.name}")
+        print(f"{profile.account}: wrote {json_path.name} and {raw_path.name}")
  
  
 def main() -> None:
@@ -127,7 +138,7 @@ def main() -> None:
     parser.add_argument(
         "--generate-test-fixtures",
         action="store_true",
-        help="Ignore --client-id and write CSV/raw files for every mock test client.",
+        help="Ignore --client-id and write JSON/raw files for every mock test client.",
     )
     args = parser.parse_args()
  
@@ -139,10 +150,10 @@ def main() -> None:
  
     account_name = args.account_name or args.client_id
     profile = build_profile(account_name=account_name, client_id=args.client_id)
-    csv_path = write_keyword_csv(profile)
+    json_path = write_keyword_json(profile)
     raw_path = write_raw_profile(profile)
  
-    print(f"Wrote {csv_path}")
+    print(f"Wrote {json_path}")
     print(f"Wrote {raw_path}")
  
 if __name__ == "__main__":

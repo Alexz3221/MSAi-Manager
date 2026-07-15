@@ -1,0 +1,31 @@
+{
+  "msa_id": "gcp_msa_alert_01",
+  "raw_msa_path": "msa_data/raw/gcp_msa_alert_01.txt",
+  "subject": "[Mandatory Service Announcement] Upcoming Apigee MCP Status Code Updates",
+  "date": "July 09, 2026",
+  "effective_date": "2026-09-03",
+  "requires_customer_action": true,
+  "affected_services": [
+    {
+      "name": "apigee",
+      "aliases": [
+        "apigee api management",
+        "apigee native serving"
+      ]
+    },
+    {
+      "name": "model context protocol",
+      "aliases": [
+        "mcp",
+        "apigee mcp"
+      ]
+    },
+    {
+      "name": "oauth",
+      "aliases": [
+        "oauth protected resource metadata",
+        "prm"
+      ]
+    }
+  ]
+}

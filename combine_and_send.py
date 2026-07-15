@@ -1,20 +1,15 @@
 from __future__ import annotations
 
-import csv
 from dataclasses import dataclass
 from pathlib import Path
 
-
-ROOT = Path(__file__).parent
-CUSTOMER_RAW_DIR = ROOT / "customer_data" / "raw"
-CUSTOMER_KEYWORDS_DIR = ROOT / "customer_data" / "customer_keywords_cleaned"
-MSA_KEYWORDS_DIR = ROOT / "msa_data" / "msa_keywords_cleaned"
-RAW_MSA_DIR = ROOT / "msa_data" / "raw"
+from msa_chatbot import build_matches, load_customer_profiles
 
 
 @dataclass(frozen=True)
 class Notification:
     account: str
+    contacts: list[str]
     msa_id: str
     subject: str
     customer_raw_path: Path
@@ -22,72 +17,21 @@ class Notification:
     matching_services: list[str]
 
 
-def read_keywords(csv_path: Path) -> set[str]:
-    """Read one keyword per row from the first column of a CSV."""
-    keywords: set[str] = set()
-
-    with csv_path.open(newline="", encoding="utf-8-sig") as file:
-        reader = csv.reader(file)
-        for row in reader:
-            if row and row[0].strip():
-                keywords.add(row[0].strip().casefold())
-
-    return keywords
-
-
-def load_keyword_files(folder: Path) -> dict[str, set[str]]:
-    return {
-        csv_path.stem: read_keywords(csv_path)
-        for csv_path in sorted(folder.glob("*.csv"))
-    }
-
-
-def raw_msa_id_for_keyword_file(keyword_file_id: str) -> str:
-    if keyword_file_id.endswith("_keywords"):
-        return keyword_file_id.removesuffix("_keywords")
-    return keyword_file_id
-
-
-def raw_msa_path_for(keyword_file_id: str) -> Path:
-    return RAW_MSA_DIR / f"{raw_msa_id_for_keyword_file(keyword_file_id)}.txt"
-
-
-def raw_customer_path_for(account_name: str) -> Path:
-    return CUSTOMER_RAW_DIR / f"{account_name}.txt"
-
-
-def read_msa_subject(raw_msa_path: Path) -> str:
-    if not raw_msa_path.exists():
-        return "Unknown subject"
-
-    with raw_msa_path.open(encoding="utf-8-sig", errors="replace") as file:
-        for line in file:
-            if line.startswith("Subject:"):
-                return line.removeprefix("Subject:").strip()
-
-    return "Unknown subject"
-
-
 def build_notifications() -> list[Notification]:
-    customer_accounts = load_keyword_files(CUSTOMER_KEYWORDS_DIR)
-    cleaned_msa_keywords = load_keyword_files(MSA_KEYWORDS_DIR)
+    customer_profiles = load_customer_profiles()
     notifications: list[Notification] = []
 
-    for account_name, account_services in customer_accounts.items():
-        for keyword_file_id, msa_keywords in cleaned_msa_keywords.items():
-            matching_services = sorted(account_services & msa_keywords)
-            if not matching_services:
-                continue
-
-            raw_msa_path = raw_msa_path_for(keyword_file_id)
+    for profile in customer_profiles.values():
+        for match in build_matches(profile.company_id):
             notifications.append(
                 Notification(
-                    account=account_name,
-                    msa_id=raw_msa_id_for_keyword_file(keyword_file_id),
-                    subject=read_msa_subject(raw_msa_path),
-                    customer_raw_path=raw_customer_path_for(account_name),
-                    raw_msa_path=raw_msa_path,
-                    matching_services=matching_services,
+                    account=profile.company_name,
+                    contacts=profile.contacts,
+                    msa_id=match.msa_id,
+                    subject=match.subject,
+                    customer_raw_path=profile.raw_customer_path,
+                    raw_msa_path=match.raw_msa_path,
+                    matching_services=match.matching_services,
                 )
             )
 
@@ -96,9 +40,10 @@ def build_notifications() -> list[Notification]:
 
 def pretend_send_notification(notification: Notification) -> None:
     services = ", ".join(notification.matching_services)
+    recipients = ", ".join(notification.contacts) or "missing-contact@example.com"
 
     print("PRETEND EMAIL")
-    print(f"  to: legal-contact+{notification.account}@example.com")
+    print(f"  to: {recipients}")
     print(f"  subject: Relevant Google Cloud MSA update: {notification.subject}")
     print(f"  company: {notification.account}")
     print(f"  matched_services: {services}")
