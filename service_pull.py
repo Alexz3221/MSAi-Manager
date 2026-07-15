@@ -131,7 +131,7 @@ def query_services(client_id: str) -> list[str]:
                         if asset.asset_type:
                             service_api_name = asset.asset_type.split("/")[0]
                             service = API_TO_KEYWORD_MAP.get(service_api_name, service_api_name)
-                            active_services.add(service)
+                            active_services.append(service)
                 except Exception as proj_err:
                     print(f"Error listing assets for project '{proj_id}': {proj_err}")
         else:
