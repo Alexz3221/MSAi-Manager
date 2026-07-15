@@ -14,6 +14,7 @@ from msa_chatbot import build_matches, load_customer_profiles
 
 ROOT = Path(__file__).parent
 DEFAULT_OUTPUT_DIR = ROOT / "outputs" / "email_previews"
+DEFAULT_TEST_RECIPIENTS = ["azhou@gccsprinternships.com"]
 
 
 @dataclass(frozen=True)
@@ -74,8 +75,8 @@ def email_subject(notification: Notification) -> str:
     return f"Relevant Google Cloud MSA update: {notification.subject}"
 
 
-def recipient_list(notification: Notification) -> list[str]:
-    return notification.contacts or ["missing-contact@example.com"]
+def recipient_list(override_recipients: list[str] | None = None) -> list[str]:
+    return override_recipients or DEFAULT_TEST_RECIPIENTS
 
 
 def render_text_email(notification: Notification) -> str:
@@ -211,12 +212,15 @@ def render_html_email(notification: Notification) -> str:
 def build_email_message(
     notification: Notification,
     sender: str,
+    recipients: list[str] | None = None,
 ) -> EmailMessage:
     message = EmailMessage()
     message["From"] = sender
-    message["To"] = ", ".join(recipient_list(notification))
+    message["To"] = ", ".join(recipient_list(recipients))
     message["Subject"] = email_subject(notification)
     message["X-MSAi-Preview"] = "true"
+    if notification.contacts:
+        message["X-MSAi-Original-Recipients"] = ", ".join(notification.contacts)
     message.set_content(render_text_email(notification))
     message.add_alternative(render_html_email(notification), subtype="html")
     return message
@@ -226,6 +230,7 @@ def write_email_preview(
     notification: Notification,
     output_dir: Path,
     sender: str,
+    recipients: list[str] | None = None,
 ) -> EmailPreview:
     output_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{safe_slug(notification.account)}__{safe_slug(notification.msa_id)}"
@@ -236,7 +241,11 @@ def write_email_preview(
     text_path.write_text(render_text_email(notification), encoding="utf-8")
     html_path.write_text(render_html_email(notification), encoding="utf-8")
     eml_path.write_text(
-        build_email_message(notification, sender=sender).as_string(),
+        build_email_message(
+            notification=notification,
+            sender=sender,
+            recipients=recipients,
+        ).as_string(),
         encoding="utf-8",
     )
 
@@ -259,12 +268,15 @@ def send_email(message: EmailMessage) -> None:
 def pretend_send_notification(
     notification: Notification,
     preview: EmailPreview,
+    recipients: list[str] | None = None,
 ) -> None:
     services = ", ".join(notification.matching_services)
-    recipients = ", ".join(recipient_list(notification))
+    routed_recipients = ", ".join(recipient_list(recipients))
+    original_recipients = ", ".join(notification.contacts) or "none"
 
     print("PRETEND EMAIL")
-    print(f"  to: {recipients}")
+    print(f"  to: {routed_recipients}")
+    print(f"  original_customer_contacts: {original_recipients}")
     print(f"  subject: {email_subject(notification)}")
     print(f"  company: {notification.account}")
     print(f"  matched_services: {services}")
@@ -289,11 +301,20 @@ def main() -> None:
         help="Email sender address used in generated .eml files.",
     )
     parser.add_argument(
+        "--recipient",
+        action="append",
+        help=(
+            "Recipient for generated/sent emails. Defaults to "
+            "azhou@gccsprinternships.com. Repeat to add multiple recipients."
+        ),
+    )
+    parser.add_argument(
         "--send",
         action="store_true",
         help="Actually send email through SMTP_HOST. Omit this to only write previews.",
     )
     args = parser.parse_args()
+    recipients = args.recipient or DEFAULT_TEST_RECIPIENTS
 
     notifications = build_notifications()
 
@@ -306,11 +327,18 @@ def main() -> None:
             notification=notification,
             output_dir=Path(args.output_dir),
             sender=args.sender,
+            recipients=recipients,
         )
-        pretend_send_notification(notification, preview)
+        pretend_send_notification(notification, preview, recipients=recipients)
 
         if args.send:
-            send_email(build_email_message(notification, sender=args.sender))
+            send_email(
+                build_email_message(
+                    notification=notification,
+                    sender=args.sender,
+                    recipients=recipients,
+                )
+            )
 
 
 if __name__ == "__main__":
