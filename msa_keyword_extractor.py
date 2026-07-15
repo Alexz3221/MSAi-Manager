@@ -2,6 +2,20 @@ import re   # REGEX
 import glob
 import sys
 import os
+import csv
+from pathlib import Path
+
+GCP_SERVICES = [ "apigee mcp", "apigee",
+    "bigquery",
+    "cloud storage",
+    "compute engine",
+    "cloud functions",
+    "google kubernetes engine",
+    "pub/sub",
+    "vertex ai",
+]
+
+MSA_KEYWORDS_DIR = Path(__file__).parent / "msa_data" / "msa_keywords_cleaned"
 
 def parse_msa_file(filepath):
     with open(filepath, 'r') as file:
@@ -24,6 +38,11 @@ def parse_msa_file(filepath):
     deadline_match = re.search(r"Action advised before\s*(.*?):", text)
     deadline = deadline_match.group(1) if deadline_match else "Unknown Deadline"
 
+    #Affected Services
+    header_region = text.split("WHAT YOU NEED TO KNOW")[0]
+    service_matches = [svc for svc in GCP_SERVICES if svc.lower() in header_region.lower()]
+    affected_services = max(service_matches, key=len) if service_matches else "Unknown Service"
+
     # Project IDs
     # Look for everything between the intro line and the footer
     project_section = re.search(r"Your affected projects are listed below:\n(.*?)\n\nWE'RE HERE TO HELP", text, re.DOTALL)
@@ -37,13 +56,28 @@ def parse_msa_file(filepath):
     print(date)
     print(deadline)
     print(projects)
+    print(affected_services)
     print()
+
+    # ADDED: write the keyword CSV that combine_and_send.py / msa_chatbot.py
+    # actually read via read_keywords(). 
+    if affected_services != "Unknown Service":
+        msa_id = Path(filepath).stem
+        MSA_KEYWORDS_DIR.mkdir(parents=True, exist_ok=True)
+        out_path = MSA_KEYWORDS_DIR / f"{msa_id}_keywords.csv"
+        with out_path.open("w", newline="", encoding="utf-8") as out_file:
+            writer = csv.writer(out_file)
+            writer.writerow([affected_services.strip().casefold()])
+        print(f"Wrote {out_path}")
+        print()
+
 
     return {
         "alert": subject,
         "date": date,
         "deadline": deadline,
-        "impacted_projects": projects
+        "impacted_projects": projects,
+        "affected_service": affected_services 
     }
 
 # Loop through your files
