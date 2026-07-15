@@ -114,8 +114,8 @@ def query_services(client_id: str) -> list[str]:
             for policy in response:
                 if "projects/" in policy.resource:
                     proj = policy.resource.split("projects/")[-1]
-                    projects_ids.add(proj)
-            if not projects_ids:
+                    project_ids.add(proj)
+            if not project_ids:
                 print(f"No projects found associated with email '{client_id}'.")
                 return []
             for proj_id in project_ids:
