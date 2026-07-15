@@ -189,8 +189,8 @@ def html_page() -> str:
 
     .date-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      grid-template-columns: 1fr;
+      gap: 10px;
     }
 
     .toggle {
