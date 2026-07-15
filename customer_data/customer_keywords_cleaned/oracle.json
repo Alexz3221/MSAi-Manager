@@ -1,0 +1,46 @@
+{
+  "company_id": "oracle",
+  "company_name": "Oracle",
+  "contacts": [
+    "legal-contact+oracle@example.com"
+  ],
+  "raw_customer_path": "customer_data/raw/oracle.txt",
+  "services": [
+    {
+      "name": "apigee",
+      "aliases": [
+        "apigee api management",
+        "apigee x"
+      ],
+      "confidence": 0.9,
+      "source": "customer_data/raw/oracle.txt"
+    },
+    {
+      "name": "model context protocol",
+      "aliases": [
+        "mcp",
+        "apigee mcp"
+      ],
+      "confidence": 0.84,
+      "source": "customer_data/raw/oracle.txt"
+    },
+    {
+      "name": "cloud functions",
+      "aliases": [
+        "google cloud functions",
+        "functions"
+      ],
+      "confidence": 0.79,
+      "source": "customer_data/raw/oracle.txt"
+    },
+    {
+      "name": "compute engine",
+      "aliases": [
+        "gce",
+        "google compute engine"
+      ],
+      "confidence": 0.74,
+      "source": "customer_data/raw/oracle.txt"
+    }
+  ]
+}

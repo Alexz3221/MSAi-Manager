@@ -2,7 +2,7 @@ import re   # REGEX
 import glob
 import sys
 import os
-import csv
+import json
 from pathlib import Path
 
 GCP_SERVICES = [ "apigee mcp", "apigee",
@@ -59,15 +59,32 @@ def parse_msa_file(filepath):
     print(affected_services)
     print()
 
-    # ADDED: write the keyword CSV that combine_and_send.py / msa_chatbot.py
-    # actually read via read_keywords(). 
+    # Write a structured cleaned JSON profile for the feed and matcher.
     if affected_services != "Unknown Service":
         msa_id = Path(filepath).stem
         MSA_KEYWORDS_DIR.mkdir(parents=True, exist_ok=True)
-        out_path = MSA_KEYWORDS_DIR / f"{msa_id}_keywords.csv"
-        with out_path.open("w", newline="", encoding="utf-8") as out_file:
-            writer = csv.writer(out_file)
-            writer.writerow([affected_services.strip().casefold()])
+        out_path = MSA_KEYWORDS_DIR / f"{msa_id}.json"
+        raw_path = Path(filepath)
+        try:
+            raw_msa_path = raw_path.relative_to(Path(__file__).parent)
+        except ValueError:
+            raw_msa_path = raw_path
+
+        payload = {
+            "msa_id": msa_id,
+            "raw_msa_path": str(raw_msa_path).replace("\\", "/"),
+            "subject": subject,
+            "date": date,
+            "effective_date": deadline if deadline != "Unknown Deadline" else None,
+            "requires_customer_action": deadline != "Unknown Deadline",
+            "affected_services": [
+                {
+                    "name": affected_services.strip().casefold(),
+                    "aliases": [],
+                }
+            ],
+        }
+        out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         print(f"Wrote {out_path}")
         print()
 

@@ -3,15 +3,12 @@ from __future__ import annotations
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from msa_chatbot import (
-    CUSTOMER_KEYWORDS_DIR,
-    build_matches,
-    display_name,
-    find_company,
-    load_keyword_files,
+    build_feed,
+    load_customer_profiles,
+    load_msa_profiles,
 )
 
 
@@ -19,49 +16,80 @@ HOST = "0.0.0.0"
 PORT = int(os.environ.get("PORT", "8080"))
 
 
-def company_payload(company_query: str) -> tuple[int, dict[str, object]]:
-    companies = load_keyword_files(CUSTOMER_KEYWORDS_DIR)
-    company_name = find_company(company_query, companies)
+def bool_param(value: str | None) -> bool | None:
+    if value is None or value == "":
+        return None
+    return value.casefold() in {"1", "true", "yes", "y"}
 
-    if company_name is None:
-        return 404, {
-            "error": f"No cleaned customer profile found for '{company_query}'.",
-            "available_companies": [
-                {"id": company_id, "name": display_name(company_id)}
-                for company_id in companies
-            ],
-        }
 
-    matches = build_matches(company_name)
-    return 200, {
-        "company": {
-            "id": company_name,
-            "name": display_name(company_name),
-            "services": sorted(companies[company_name]),
-        },
-        "matches": [
+def feed_item_payload(item) -> dict[str, object]:
+    return {
+        "msa_id": item.msa_id,
+        "subject": item.subject,
+        "date": item.date,
+        "effective_date": item.effective_date,
+        "requires_customer_action": item.requires_customer_action,
+        "affected_services": item.affected_services,
+        "impacted_companies": [
             {
-                "msa_id": match.msa_id,
-                "subject": match.subject,
-                "date": match.date,
-                "matching_services": match.matching_services,
-                "summary": match.summary,
-                "actions": match.actions,
-                "raw_msa_path": str(match.raw_msa_path),
+                "company_id": impact.company_id,
+                "company_name": impact.company_name,
+                "contacts": impact.contacts,
+                "matching_services": impact.matching_services,
             }
-            for match in matches
+            for impact in item.impacted_companies
         ],
+        "summary": item.summary,
+        "actions": item.actions,
+        "raw_msa_path": str(item.raw_msa_path),
     }
 
 
-def list_companies_payload() -> dict[str, object]:
-    companies = load_keyword_files(CUSTOMER_KEYWORDS_DIR)
+def feed_payload(query: dict[str, list[str]]) -> dict[str, object]:
+    company = query.get("company", [""])[0].strip() or None
+    service = query.get("service", [""])[0].strip() or None
+    effective_from = query.get("effective_from", [""])[0].strip() or None
+    effective_to = query.get("effective_to", [""])[0].strip() or None
+    requires_action = bool_param(query.get("requires_action", [""])[0])
+    feed = build_feed(
+        company_query=company,
+        service_query=service,
+        requires_action=requires_action,
+        effective_from=effective_from,
+        effective_to=effective_to,
+    )
+
+    return {
+        "filters": {
+            "company": company,
+            "service": service,
+            "effective_from": effective_from,
+            "effective_to": effective_to,
+            "requires_action": requires_action,
+        },
+        "count": len(feed),
+        "items": [feed_item_payload(item) for item in feed],
+    }
+
+
+def companies_payload() -> dict[str, object]:
     return {
         "companies": [
-            {"id": company_id, "name": display_name(company_id)}
-            for company_id in companies
+            {"id": profile.company_id, "name": profile.company_name}
+            for profile in load_customer_profiles().values()
         ]
     }
+
+
+def services_payload() -> dict[str, object]:
+    services = set()
+
+    for profile in load_customer_profiles().values():
+        services.update(profile.services)
+    for profile in load_msa_profiles().values():
+        services.update(profile.affected_services)
+
+    return {"services": sorted(services)}
 
 
 def html_page() -> str:
@@ -73,51 +101,51 @@ def html_page() -> str:
   <title>MSAi Manager</title>
   <style>
     :root {
-      --ink: #18211f;
-      --muted: #5b6864;
-      --line: #d9e1dc;
-      --field: #f7faf8;
+      --ink: #17211f;
+      --muted: #65716d;
+      --line: #d7e1dc;
       --paper: #ffffff;
-      --accent: #0f7b63;
-      --accent-strong: #084f42;
-      --warn: #a75318;
-      --bg: #edf4f0;
+      --panel: rgba(255, 255, 255, 0.9);
+      --field: #f7faf8;
+      --accent: #0d7562;
+      --accent-strong: #074d41;
+      --warning: #9a521e;
+      --bg: #eef5f1;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
       color: var(--ink);
       background:
-        linear-gradient(135deg, rgba(15, 123, 99, 0.13), transparent 34%),
-        linear-gradient(315deg, rgba(167, 83, 24, 0.12), transparent 30%),
+        linear-gradient(135deg, rgba(13, 117, 98, 0.14), transparent 32%),
+        linear-gradient(315deg, rgba(154, 82, 30, 0.12), transparent 35%),
         var(--bg);
       font-family: Georgia, "Times New Roman", serif;
       min-height: 100vh;
     }
 
     main {
-      width: min(1120px, calc(100% - 32px));
+      width: min(1200px, calc(100% - 32px));
       margin: 0 auto;
-      padding: 36px 0;
+      padding: 34px 0;
     }
 
-    .workspace {
+    .layout {
       display: grid;
-      grid-template-columns: 320px 1fr;
+      grid-template-columns: 310px 1fr;
       gap: 18px;
       align-items: start;
     }
 
     .panel,
-    .result-card {
-      background: rgba(255, 255, 255, 0.88);
+    .feed-card,
+    .stat {
+      background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 8px;
-      box-shadow: 0 20px 48px rgba(24, 33, 31, 0.08);
+      box-shadow: 0 18px 42px rgba(23, 33, 31, 0.08);
     }
 
     .panel {
@@ -127,102 +155,122 @@ def html_page() -> str:
     }
 
     h1 {
-      margin: 0 0 10px;
       font-size: 30px;
       line-height: 1.05;
+      margin: 0 0 10px;
     }
 
     .subtitle {
-      margin: 0 0 22px;
       color: var(--muted);
       font-size: 15px;
       line-height: 1.45;
+      margin: 0 0 20px;
     }
 
     label {
-      display: block;
       color: var(--muted);
+      display: block;
       font: 700 12px/1.2 Verdana, sans-serif;
-      letter-spacing: 0;
-      margin-bottom: 8px;
+      margin: 14px 0 7px;
       text-transform: uppercase;
     }
 
-    .lookup {
-      display: flex;
-      gap: 8px;
-    }
-
+    select,
     input {
       width: 100%;
-      min-width: 0;
       border: 1px solid var(--line);
       border-radius: 6px;
       background: var(--field);
       color: var(--ink);
-      font: 16px/1.2 Georgia, "Times New Roman", serif;
-      padding: 12px;
+      font: 15px/1.2 Georgia, "Times New Roman", serif;
+      min-height: 42px;
+      padding: 10px;
+    }
+
+    .date-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .toggle {
+      align-items: center;
+      display: flex;
+      gap: 9px;
+      margin-top: 14px;
+    }
+
+    .toggle input {
+      min-height: auto;
+      width: auto;
     }
 
     button {
+      width: 100%;
       border: 0;
       border-radius: 6px;
       background: var(--accent);
       color: white;
       cursor: pointer;
       font: 700 14px/1 Verdana, sans-serif;
-      padding: 0 16px;
-      min-height: 45px;
+      margin-top: 18px;
+      min-height: 44px;
+      padding: 0 14px;
     }
 
-    button:hover {
-      background: var(--accent-strong);
+    button:hover { background: var(--accent-strong); }
+
+    .topline {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
     }
 
-    .examples {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 14px;
+    .stat {
+      padding: 14px;
     }
 
-    .example {
-      border: 1px solid var(--line);
-      background: var(--paper);
-      color: var(--ink);
-      min-height: 34px;
-      padding: 0 10px;
-      font-size: 12px;
+    .stat strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1;
     }
 
-    .results {
+    .stat span {
+      color: var(--muted);
+      font: 700 11px/1 Verdana, sans-serif;
+      text-transform: uppercase;
+    }
+
+    .feed {
       display: grid;
       gap: 14px;
     }
 
-    .empty {
-      padding: 28px;
-      color: var(--muted);
-    }
-
-    .result-card {
+    .feed-card {
       padding: 22px;
     }
 
     .meta {
       color: var(--muted);
       font: 700 12px/1.3 Verdana, sans-serif;
-      margin-bottom: 10px;
+      margin-bottom: 9px;
       text-transform: uppercase;
     }
 
     h2 {
-      margin: 0 0 10px;
       font-size: 22px;
       line-height: 1.2;
+      margin: 0 0 12px;
     }
 
-    .services {
+    p {
+      line-height: 1.55;
+      margin: 10px 0;
+    }
+
+    .pills {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
@@ -230,18 +278,18 @@ def html_page() -> str:
     }
 
     .pill {
-      background: #e6f3ee;
-      border: 1px solid #c9e2d8;
+      background: #e5f2ed;
+      border: 1px solid #c8e0d7;
       border-radius: 999px;
       color: var(--accent-strong);
       font: 700 12px/1 Verdana, sans-serif;
       padding: 7px 10px;
     }
 
-    p {
-      color: var(--ink);
-      line-height: 1.55;
-      margin: 10px 0;
+    .pill.warning {
+      background: #fff1e7;
+      border-color: #f0cfb4;
+      color: var(--warning);
     }
 
     ul {
@@ -250,8 +298,8 @@ def html_page() -> str:
     }
 
     li {
-      margin: 7px 0;
       line-height: 1.4;
+      margin: 7px 0;
     }
 
     .path {
@@ -260,8 +308,9 @@ def html_page() -> str:
       overflow-wrap: anywhere;
     }
 
-    @media (max-width: 820px) {
-      .workspace {
+    @media (max-width: 860px) {
+      .layout,
+      .topline {
         grid-template-columns: 1fr;
       }
 
@@ -273,33 +322,59 @@ def html_page() -> str:
 </head>
 <body>
   <main>
-    <div class="workspace">
-      <section class="panel">
-        <h1>MSAi Manager</h1>
-        <p class="subtitle">Look up a company and see which Google Cloud MSA notices are relevant to the services it uses.</p>
-        <form class="lookup" id="lookup-form">
-          <div style="flex: 1;">
-            <label for="company">Company</label>
-            <input id="company" name="company" value="Apple" autocomplete="off">
+    <div class="layout">
+      <aside class="panel">
+        <h1>MSA Feed</h1>
+        <p class="subtitle">Browse all MSA notices and filter by company, service, timing, and whether action is required.</p>
+        <form id="filters">
+          <label for="company">Company</label>
+          <select id="company" name="company"></select>
+
+          <label for="service">Service</label>
+          <select id="service" name="service"></select>
+
+          <div class="date-grid">
+            <div>
+              <label for="effective_from">From</label>
+              <input id="effective_from" name="effective_from" type="date">
+            </div>
+            <div>
+              <label for="effective_to">To</label>
+              <input id="effective_to" name="effective_to" type="date">
+            </div>
           </div>
-          <button type="submit" aria-label="Search">Search</button>
+
+          <label class="toggle">
+            <input id="requires_action" name="requires_action" type="checkbox">
+            Requires customer action
+          </label>
+
+          <button type="submit">Apply filters</button>
         </form>
-        <div class="examples" id="examples"></div>
-      </section>
-      <section class="results" id="results">
-        <div class="result-card empty">Search Apple or Oracle to preview relevant MSA notices.</div>
+      </aside>
+
+      <section>
+        <div class="topline">
+          <div class="stat"><strong id="notice-count">0</strong><span>Matching MSAs</span></div>
+          <div class="stat"><strong id="company-count">0</strong><span>Impacted companies</span></div>
+          <div class="stat"><strong id="action-count">0</strong><span>Action required</span></div>
+        </div>
+        <div class="feed" id="feed"></div>
       </section>
     </div>
   </main>
 
   <script>
-    const form = document.querySelector("#lookup-form");
-    const input = document.querySelector("#company");
-    const results = document.querySelector("#results");
-    const examples = document.querySelector("#examples");
+    const filters = document.querySelector("#filters");
+    const companySelect = document.querySelector("#company");
+    const serviceSelect = document.querySelector("#service");
+    const feed = document.querySelector("#feed");
+    const noticeCount = document.querySelector("#notice-count");
+    const companyCount = document.querySelector("#company-count");
+    const actionCount = document.querySelector("#action-count");
 
     function escapeHtml(value) {
-      return String(value).replace(/[&<>"']/g, char => ({
+      return String(value ?? "").replace(/[&<>"']/g, char => ({
         "&": "&amp;",
         "<": "&lt;",
         ">": "&gt;",
@@ -308,87 +383,98 @@ def html_page() -> str:
       }[char]));
     }
 
-    function renderError(message, companies = []) {
-      const companyList = companies.map(company => `<li>${escapeHtml(company.name)}</li>`).join("");
-      results.innerHTML = `
-        <div class="result-card empty">
-          <strong>${escapeHtml(message)}</strong>
-          ${companyList ? `<ul>${companyList}</ul>` : ""}
-        </div>
-      `;
+    function option(value, label) {
+      return `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
     }
 
-    function renderPayload(payload) {
-      if (!payload.matches.length) {
-        results.innerHTML = `<div class="result-card empty">No relevant MSA notices found for ${escapeHtml(payload.company.name)}.</div>`;
+    async function loadFilters() {
+      const [companiesResponse, servicesResponse] = await Promise.all([
+        fetch("/api/companies"),
+        fetch("/api/services")
+      ]);
+      const companies = await companiesResponse.json();
+      const services = await servicesResponse.json();
+
+      companySelect.innerHTML = option("", "All companies") + companies.companies
+        .map(company => option(company.id, company.name))
+        .join("");
+      serviceSelect.innerHTML = option("", "All services") + services.services
+        .map(service => option(service, service))
+        .join("");
+    }
+
+    function paramsFromForm() {
+      const data = new FormData(filters);
+      const params = new URLSearchParams();
+      for (const [key, value] of data.entries()) {
+        if (value) params.set(key, value);
+      }
+      if (document.querySelector("#requires_action").checked) {
+        params.set("requires_action", "true");
+      }
+      return params;
+    }
+
+    function renderFeed(payload) {
+      const impacted = new Set();
+      let actionRequired = 0;
+
+      payload.items.forEach(item => {
+        if (item.requires_customer_action) actionRequired += 1;
+        item.impacted_companies.forEach(company => impacted.add(company.company_id));
+      });
+
+      noticeCount.textContent = payload.count;
+      companyCount.textContent = impacted.size;
+      actionCount.textContent = actionRequired;
+
+      if (!payload.items.length) {
+        feed.innerHTML = `<article class="feed-card">No MSA notices match the selected filters.</article>`;
         return;
       }
 
-      const servicePills = payload.company.services
-        .map(service => `<span class="pill">${escapeHtml(service)}</span>`)
-        .join("");
-
-      const cards = payload.matches.map(match => {
-        const matched = match.matching_services
+      feed.innerHTML = payload.items.map(item => {
+        const services = item.affected_services
           .map(service => `<span class="pill">${escapeHtml(service)}</span>`)
           .join("");
-        const actions = match.actions
+        const companies = item.impacted_companies
+          .map(company => {
+            const matched = company.matching_services.join(", ");
+            return `<span class="pill warning">${escapeHtml(company.company_name)}: ${escapeHtml(matched)}</span>`;
+          })
+          .join("");
+        const actions = item.actions
           .map(action => `<li>${escapeHtml(action)}</li>`)
           .join("");
 
         return `
-          <article class="result-card">
-            <div class="meta">${escapeHtml(match.date)} · ${escapeHtml(match.msa_id)}</div>
-            <h2>${escapeHtml(match.subject)}</h2>
-            <div class="services">${matched}</div>
-            <p>${escapeHtml(match.summary)}</p>
+          <article class="feed-card">
+            <div class="meta">${escapeHtml(item.date)} | ${escapeHtml(item.msa_id)}</div>
+            <h2>${escapeHtml(item.subject)}</h2>
+            <div class="pills">${services}</div>
+            <p><strong>Effective date:</strong> ${escapeHtml(item.effective_date || "Not listed")}</p>
+            <p><strong>Customer action required:</strong> ${item.requires_customer_action ? "Yes" : "No"}</p>
+            <p>${escapeHtml(item.summary)}</p>
+            <div class="pills">${companies}</div>
             ${actions ? `<ul>${actions}</ul>` : ""}
-            <p class="path">${escapeHtml(match.raw_msa_path)}</p>
+            <p class="path">${escapeHtml(item.raw_msa_path)}</p>
           </article>
         `;
       }).join("");
-
-      results.innerHTML = `
-        <article class="result-card">
-          <div class="meta">Detected services for ${escapeHtml(payload.company.name)}</div>
-          <div class="services">${servicePills}</div>
-        </article>
-        ${cards}
-      `;
     }
 
-    async function searchCompany(companyName) {
-      results.innerHTML = `<div class="result-card empty">Checking relevant MSA notices...</div>`;
-      const response = await fetch(`/api/company?name=${encodeURIComponent(companyName)}`);
-      const payload = await response.json();
-      if (!response.ok) {
-        renderError(payload.error || "Company not found.", payload.available_companies || []);
-        return;
-      }
-      renderPayload(payload);
+    async function loadFeed() {
+      feed.innerHTML = `<article class="feed-card">Loading MSA feed...</article>`;
+      const response = await fetch(`/api/feed?${paramsFromForm().toString()}`);
+      renderFeed(await response.json());
     }
 
-    async function loadExamples() {
-      const response = await fetch("/api/companies");
-      const payload = await response.json();
-      examples.innerHTML = payload.companies.map(company => (
-        `<button class="example" type="button" data-company="${escapeHtml(company.name)}">${escapeHtml(company.name)}</button>`
-      )).join("");
-    }
-
-    form.addEventListener("submit", event => {
+    filters.addEventListener("submit", event => {
       event.preventDefault();
-      searchCompany(input.value);
+      loadFeed();
     });
 
-    examples.addEventListener("click", event => {
-      const button = event.target.closest("button[data-company]");
-      if (!button) return;
-      input.value = button.dataset.company;
-      searchCompany(button.dataset.company);
-    });
-
-    loadExamples();
+    loadFilters().then(loadFeed);
   </script>
 </body>
 </html>"""
@@ -413,6 +499,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         parsed_url = urlparse(self.path)
+        query = parse_qs(parsed_url.query)
 
         if parsed_url.path == "/":
             self.send_html(html_page())
@@ -423,18 +510,19 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         if parsed_url.path == "/api/companies":
-            self.send_json(200, list_companies_payload())
+            self.send_json(200, companies_payload())
             return
 
-        if parsed_url.path == "/api/company":
-            query = parse_qs(parsed_url.query)
-            company_query = query.get("name", [""])[0]
-            if not company_query.strip():
-                self.send_json(400, {"error": "Missing required query parameter: name"})
-                return
+        if parsed_url.path == "/api/services":
+            self.send_json(200, services_payload())
+            return
 
-            status, payload = company_payload(company_query)
-            self.send_json(status, payload)
+        if parsed_url.path in {"/api/feed", "/api/company"}:
+            if parsed_url.path == "/api/company" and "company" not in query:
+                name = query.get("name", [""])[0]
+                if name:
+                    query["company"] = [name]
+            self.send_json(200, feed_payload(query))
             return
 
         self.send_json(404, {"error": "Not found"})

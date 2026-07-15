@@ -1,15 +1,38 @@
 from __future__ import annotations
 
 import argparse
-import csv
+import json
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
+from typing import Any
 
 
 ROOT = Path(__file__).parent
-CUSTOMER_KEYWORDS_DIR = ROOT / "customer_data" / "customer_keywords_cleaned"
-MSA_KEYWORDS_DIR = ROOT / "msa_data" / "msa_keywords_cleaned"
+CUSTOMER_RAW_DIR = ROOT / "customer_data" / "raw"
+CUSTOMER_PROFILES_DIR = ROOT / "customer_data" / "customer_keywords_cleaned"
+MSA_PROFILES_DIR = ROOT / "msa_data" / "msa_keywords_cleaned"
 RAW_MSA_DIR = ROOT / "msa_data" / "raw"
+
+
+@dataclass(frozen=True)
+class CustomerProfile:
+    company_id: str
+    company_name: str
+    contacts: list[str]
+    services: dict[str, set[str]]
+    raw_customer_path: Path
+
+
+@dataclass(frozen=True)
+class MsaProfile:
+    msa_id: str
+    affected_services: dict[str, set[str]]
+    raw_msa_path: Path
+    subject: str | None
+    date: str | None
+    effective_date: str | None
+    requires_customer_action: bool
 
 
 @dataclass(frozen=True)
@@ -17,7 +40,31 @@ class MsaMatch:
     msa_id: str
     subject: str
     date: str
+    effective_date: str | None
+    requires_customer_action: bool
     matching_services: list[str]
+    summary: str
+    actions: list[str]
+    raw_msa_path: Path
+
+
+@dataclass(frozen=True)
+class FeedImpact:
+    company_id: str
+    company_name: str
+    contacts: list[str]
+    matching_services: list[str]
+
+
+@dataclass(frozen=True)
+class FeedItem:
+    msa_id: str
+    subject: str
+    date: str
+    effective_date: str | None
+    requires_customer_action: bool
+    affected_services: list[str]
+    impacted_companies: list[FeedImpact]
     summary: str
     actions: list[str]
     raw_msa_path: Path
@@ -27,33 +74,71 @@ def normalize_name(value: str) -> str:
     return value.strip().casefold().replace("-", "_").replace(" ", "_")
 
 
+def normalize_term(value: str) -> str:
+    return " ".join(value.strip().casefold().replace("-", " ").split())
+
+
 def display_name(value: str) -> str:
     return value.replace("_", " ").title()
 
 
-def read_keywords(csv_path: Path) -> set[str]:
-    keywords: set[str] = set()
-
-    with csv_path.open(newline="", encoding="utf-8-sig") as file:
-        reader = csv.reader(file)
-        for row in reader:
-            if row and row[0].strip():
-                keywords.add(row[0].strip().casefold())
-
-    return keywords
+def read_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
-def load_keyword_files(folder: Path) -> dict[str, set[str]]:
-    return {
-        csv_path.stem: read_keywords(csv_path)
-        for csv_path in sorted(folder.glob("*.csv"))
-    }
+def service_terms(service: dict[str, Any]) -> tuple[str, set[str]]:
+    name = str(service["name"])
+    aliases = [str(alias) for alias in service.get("aliases", [])]
+    terms = {normalize_term(name), *(normalize_term(alias) for alias in aliases)}
+    return normalize_term(name), {term for term in terms if term}
 
 
-def cleaned_keyword_id_to_msa_id(keyword_file_id: str) -> str:
-    if keyword_file_id.endswith("_keywords"):
-        return keyword_file_id.removesuffix("_keywords")
-    return keyword_file_id
+def load_customer_profiles() -> dict[str, CustomerProfile]:
+    profiles: dict[str, CustomerProfile] = {}
+
+    for json_path in sorted(CUSTOMER_PROFILES_DIR.glob("*.json")):
+        payload = read_json(json_path)
+        company_id = normalize_name(str(payload.get("company_id") or json_path.stem))
+        raw_customer_path = ROOT / str(
+            payload.get("raw_customer_path")
+            or CUSTOMER_RAW_DIR / f"{company_id}.txt"
+        )
+        services = dict(service_terms(service) for service in payload.get("services", []))
+        profiles[company_id] = CustomerProfile(
+            company_id=company_id,
+            company_name=str(payload.get("company_name") or display_name(company_id)),
+            contacts=[str(contact) for contact in payload.get("contacts", [])],
+            services=services,
+            raw_customer_path=raw_customer_path,
+        )
+
+    return profiles
+
+
+def load_msa_profiles() -> dict[str, MsaProfile]:
+    profiles: dict[str, MsaProfile] = {}
+
+    for json_path in sorted(MSA_PROFILES_DIR.glob("*.json")):
+        payload = read_json(json_path)
+        msa_id = str(payload.get("msa_id") or json_path.stem.removesuffix("_keywords"))
+        raw_msa_path = ROOT / str(
+            payload.get("raw_msa_path")
+            or RAW_MSA_DIR / f"{msa_id}.txt"
+        )
+        affected_services = dict(
+            service_terms(service) for service in payload.get("affected_services", [])
+        )
+        profiles[msa_id] = MsaProfile(
+            msa_id=msa_id,
+            affected_services=affected_services,
+            raw_msa_path=raw_msa_path,
+            subject=payload.get("subject"),
+            date=payload.get("date"),
+            effective_date=payload.get("effective_date"),
+            requires_customer_action=bool(payload.get("requires_customer_action", False)),
+        )
+
+    return profiles
 
 
 def read_text(path: Path) -> str:
@@ -112,63 +197,200 @@ def action_items(lines: list[str], max_items: int = 3) -> list[str]:
     return actions[:max_items]
 
 
-def find_company(company_query: str, companies: dict[str, set[str]]) -> str | None:
+def find_company(
+    company_query: str,
+    companies: dict[str, CustomerProfile],
+) -> str | None:
     wanted = normalize_name(company_query)
 
     if wanted in companies:
         return wanted
 
-    for company_name in companies:
-        if wanted in company_name or company_name in wanted:
-            return company_name
+    for company_id, profile in companies.items():
+        candidates = {
+            company_id,
+            normalize_name(profile.company_name),
+        }
+        if any(wanted in candidate or candidate in wanted for candidate in candidates):
+            return company_id
 
     return None
 
 
+def matching_customer_services(
+    customer_profile: CustomerProfile,
+    msa_profile: MsaProfile,
+) -> list[str]:
+    matches: list[str] = []
+
+    for service_name, customer_terms in customer_profile.services.items():
+        for msa_terms in msa_profile.affected_services.values():
+            if customer_terms & msa_terms:
+                matches.append(service_name)
+                break
+
+    return sorted(matches)
+
+
+def parse_iso_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def matches_service_filter(msa_profile: MsaProfile, service_query: str | None) -> bool:
+    if not service_query:
+        return True
+
+    wanted = normalize_term(service_query)
+    for terms in msa_profile.affected_services.values():
+        if wanted in terms or any(wanted in term or term in wanted for term in terms):
+            return True
+
+    return False
+
+
+def matches_effective_date_filter(
+    msa_profile: MsaProfile,
+    effective_from: str | None,
+    effective_to: str | None,
+) -> bool:
+    effective_date = parse_iso_date(msa_profile.effective_date)
+    if effective_date is None:
+        return not effective_from and not effective_to
+
+    from_date = parse_iso_date(effective_from)
+    to_date = parse_iso_date(effective_to)
+
+    if from_date and effective_date < from_date:
+        return False
+    if to_date and effective_date > to_date:
+        return False
+    return True
+
+
 def build_matches(company_name: str) -> list[MsaMatch]:
-    companies = load_keyword_files(CUSTOMER_KEYWORDS_DIR)
-    customer_services = companies[company_name]
-    cleaned_msa_keywords = load_keyword_files(MSA_KEYWORDS_DIR)
+    companies = load_customer_profiles()
+    customer_profile = companies[company_name]
+    cleaned_msa_profiles = load_msa_profiles()
     matches: list[MsaMatch] = []
 
-    for keyword_file_id, msa_keywords in cleaned_msa_keywords.items():
-        matching_services = sorted(customer_services & msa_keywords)
+    for msa_profile in cleaned_msa_profiles.values():
+        matching_services = matching_customer_services(customer_profile, msa_profile)
         if not matching_services:
             continue
 
-        msa_id = cleaned_keyword_id_to_msa_id(keyword_file_id)
-        raw_msa_path = RAW_MSA_DIR / f"{msa_id}.txt"
-        raw_text = read_text(raw_msa_path)
+        raw_text = read_text(msa_profile.raw_msa_path)
         matches.append(
             MsaMatch(
-                msa_id=msa_id,
-                subject=extract_prefixed_line(raw_text, "Subject:", "Unknown subject"),
-                date=extract_prefixed_line(raw_text, "Date:", "Unknown date"),
+                msa_id=msa_profile.msa_id,
+                subject=msa_profile.subject
+                or extract_prefixed_line(raw_text, "Subject:", "Unknown subject"),
+                date=msa_profile.date
+                or extract_prefixed_line(raw_text, "Date:", "Unknown date"),
+                effective_date=msa_profile.effective_date,
+                requires_customer_action=msa_profile.requires_customer_action,
                 matching_services=matching_services,
                 summary=first_paragraph(section_lines(raw_text, "WHAT YOU NEED TO KNOW")),
                 actions=action_items(section_lines(raw_text, "WHAT YOU NEED TO DO")),
-                raw_msa_path=raw_msa_path,
+                raw_msa_path=msa_profile.raw_msa_path,
             )
         )
 
     return matches
 
 
+def build_feed(
+    company_query: str | None = None,
+    service_query: str | None = None,
+    requires_action: bool | None = None,
+    effective_from: str | None = None,
+    effective_to: str | None = None,
+) -> list[FeedItem]:
+    companies = load_customer_profiles()
+    msa_profiles = load_msa_profiles()
+    company_filter = find_company(company_query, companies) if company_query else None
+    feed: list[FeedItem] = []
+
+    if company_query and company_filter is None:
+        return feed
+
+    filtered_companies = (
+        {company_filter: companies[company_filter]}
+        if company_filter
+        else companies
+    )
+
+    for msa_profile in msa_profiles.values():
+        if requires_action is not None and msa_profile.requires_customer_action != requires_action:
+            continue
+        if not matches_service_filter(msa_profile, service_query):
+            continue
+        if not matches_effective_date_filter(msa_profile, effective_from, effective_to):
+            continue
+
+        impacts: list[FeedImpact] = []
+        for profile in filtered_companies.values():
+            matching_services = matching_customer_services(profile, msa_profile)
+            if matching_services:
+                impacts.append(
+                    FeedImpact(
+                        company_id=profile.company_id,
+                        company_name=profile.company_name,
+                        contacts=profile.contacts,
+                        matching_services=matching_services,
+                    )
+                )
+
+        if not impacts:
+            continue
+
+        raw_text = read_text(msa_profile.raw_msa_path)
+        feed.append(
+            FeedItem(
+                msa_id=msa_profile.msa_id,
+                subject=msa_profile.subject
+                or extract_prefixed_line(raw_text, "Subject:", "Unknown subject"),
+                date=msa_profile.date
+                or extract_prefixed_line(raw_text, "Date:", "Unknown date"),
+                effective_date=msa_profile.effective_date,
+                requires_customer_action=msa_profile.requires_customer_action,
+                affected_services=sorted(msa_profile.affected_services),
+                impacted_companies=impacts,
+                summary=first_paragraph(section_lines(raw_text, "WHAT YOU NEED TO KNOW")),
+                actions=action_items(section_lines(raw_text, "WHAT YOU NEED TO DO")),
+                raw_msa_path=msa_profile.raw_msa_path,
+            )
+        )
+
+    return sorted(
+        feed,
+        key=lambda item: (
+            parse_iso_date(item.effective_date) or date.max,
+            item.msa_id,
+        ),
+    )
+
+
 def print_company_answer(company_query: str) -> None:
-    companies = load_keyword_files(CUSTOMER_KEYWORDS_DIR)
+    companies = load_customer_profiles()
     company_name = find_company(company_query, companies)
 
     if company_name is None:
         print(f"I could not find a cleaned customer profile for '{company_query}'.")
         print("Available companies:")
-        for available_company in companies:
-            print(f"  - {display_name(available_company)}")
+        for available_company in companies.values():
+            print(f"  - {available_company.company_name}")
         return
 
+    profile = companies[company_name]
     matches = build_matches(company_name)
-    services = ", ".join(sorted(companies[company_name]))
+    services = ", ".join(sorted(profile.services))
 
-    print(f"Company: {display_name(company_name)}")
+    print(f"Company: {profile.company_name}")
     print(f"Detected GCP services: {services}")
     print()
 
@@ -182,6 +404,9 @@ def print_company_answer(company_query: str) -> None:
         print()
         print(f"{index}. {match.subject}")
         print(f"   Date: {match.date}")
+        if match.effective_date:
+            print(f"   Effective date: {match.effective_date}")
+        print(f"   Customer action required: {match.requires_customer_action}")
         print(f"   Matched services: {matched_services}")
         print(f"   Summary: {match.summary}")
         if match.actions:
@@ -207,9 +432,9 @@ def interactive_chat() -> None:
             return
 
         if company_query.casefold() == "companies":
-            companies = load_keyword_files(CUSTOMER_KEYWORDS_DIR)
-            for company_name in companies:
-                print(f"  - {display_name(company_name)}")
+            companies = load_customer_profiles()
+            for profile in companies.values():
+                print(f"  - {profile.company_name}")
             print()
             continue
 
