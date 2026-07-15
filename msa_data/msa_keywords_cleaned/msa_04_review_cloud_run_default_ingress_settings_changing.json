@@ -1,0 +1,25 @@
+{
+  "msa_id": "msa_04_review_cloud_run_default_ingress_settings_changing",
+  "raw_msa_path": "msa_04_review_cloud_run_default_ingress_settings_changing.txt",
+  "format": "internal",
+  "sent_date": "2026-06-19",
+  "category": "Action Advised",
+  "subject": "[Action Advised] Review Cloud Run default ingress settings changing Sep 15, 2026",
+  "headline": "Review Cloud Run default ingress settings changing Sep 15, 2026",
+  "bug_id": "b/510442776",
+  "launch_owner": "ekwon - ekwon@google.com",
+  "requires_customer_action": false,
+  "cost_implications": false,
+  "effective_date": "2026-09-15",
+  "reminder_dates": [],
+  "affected_customers": [],
+  "affected_services": [
+    {
+      "name": "cloud run",
+      "aliases": [
+        "cloud run"
+      ]
+    }
+  ],
+  "_match_scope": "subject"
+}
