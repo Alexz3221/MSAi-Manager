@@ -110,7 +110,7 @@ def query_services(client_id: str) -> list[str]:
                     "query": f"policy:{client_id}"
                 }
             )
-            projecy_ids = set()
+            project_ids = set()
             for policy in response:
                 if "projects/" in policy.resource:
                     proj = policy.resource.split("projects/")[-1]
