@@ -1,0 +1,32 @@
+Date: Tue, Jun 30, 2026 at 10:53 AM
+Subject: [Internal MSA Notification] [Action Required] Migrate Dialogflow ES agents to Conversational Agents before Jun 30, 2027
+
+Hello,
+
+You are receiving this internal announcement email as you are subscribed to the cloud-product-notifications-announce Google group.
+
+TLDR: Dialogflow ES is deprecated. Make customers aware of the migration tooling and the 12-month runway to move agents to Conversational Agents (Dialogflow CX).
+
+This communication has received final stakeholder approval and is scheduled for distribution on July 13, 2026.
+
+Please do not forward this email or the document linked directly to customers as it may contain some internal links or sensitive details.
+
+Key Details:
+MSA Bug ID	b/459884120
+Launch Owner	smehta - smehta@google.com
+MSA Doc	MSA Doc Link
+MSA Approvals	Approvals: Turbo Link
+Message Target Audience	
+The recipient list for this MSA communications was determined by smehta.
+Internal Audience
+External Audience
+Project Owners
+Project Org Admins
+Billing Admins
+Customer MSA Subject	[Action Required] Migrate Dialogflow ES agents to Conversational Agents before Jun 30, 2027
+Does this message require customers to take action, and could that action lead to cost implications?	Yes
+Are Reminder MSAs planned for this notification?	Yes
+Planned Reminder Dates, if known	Reminder 1: October 1, 2026
+Reminder 2: January 4, 2027
+Reminder 3: April 1, 2027
+Reminder 4: June 1, 2027

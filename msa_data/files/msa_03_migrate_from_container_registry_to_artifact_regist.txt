@@ -1,0 +1,31 @@
+Date: Thu, Jun 18, 2026 at 8:07 AM
+Subject: [Internal MSA Notification] [Action Required] Migrate from Container Registry to Artifact Registry by Dec 1, 2026
+
+Hello,
+
+You are receiving this internal announcement email as you are subscribed to the cloud-product-notifications-announce Google group.
+
+TLDR: Container Registry is shutting down. Goal is to drive remaining customers to complete automated or manual migration to Artifact Registry before pulls begin failing.
+
+This communication has received final stakeholder approval and is scheduled for distribution on June 30, 2026.
+
+Please do not forward this email or the document linked directly to customers as it may contain some internal links or sensitive details.
+
+Key Details:
+MSA Bug ID	b/476339207
+Launch Owner	pnaidoo - pnaidoo@google.com
+MSA Doc	MSA Doc Link
+MSA Approvals	Approvals: Turbo Link
+Message Target Audience	
+The recipient list for this MSA communications was determined by pnaidoo.
+Internal Audience
+External Audience
+Project Owners
+Project Org Admins
+Billing Admins
+Customer MSA Subject	[Action Required] Migrate from Container Registry to Artifact Registry by Dec 1, 2026
+Does this message require customers to take action, and could that action lead to cost implications?	Yes
+Are Reminder MSAs planned for this notification?	Yes
+Planned Reminder Dates, if known	Reminder 1: September 1, 2026
+Reminder 2: October 15, 2026
+Reminder 3: November 16, 2026

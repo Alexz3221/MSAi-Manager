@@ -1,0 +1,104 @@
+Date: Tue, Jul 14, 2026 at 2:52 PM
+Subject: [Account Team MSA Notification] [Action Advised] Cloud Interconnect will require MACsec-capable ports for new 100G attachments on Sep 8, 2026
+
+Hello Account Teams,
+
+TLDR: To inform customers that new 100G VLAN attachments will be provisioned only on MACsec-capable ports. Existing attachments are unaffected; the goal is planning awareness for network teams.
+
+Your customers listed below will receive a version of the following notification on July 28, 2026. The version below may undergo additional edits. To view the most up-to-date version, please refer to the Communications doc. Support resources here: go/model-migrations.
+
+Please do not forward this email or the document linked above directly to your customers as it may contain some internal links or sensitive details. Please extract and share any relevant information separately.
+
+Key details:
+
+MSA Bug ID	b/508774096
+Launch Owner	gpetrov - gpetrov@google.com
+
+Message Target Audience
+
+The recipient list filters chosen for this MSA communication were determined by gpetrov.
+
+Audience:
+External (non @google.com addresses)
+Recipients:
+Project Owners
+Essential Contacts:
+Technical
+Security
+
+Customer MSA Subject
+
+[Action Advised] Cloud Interconnect will require MACsec-capable ports for new 100G attachments on Sep 8, 2026
+
+Does this notification require proactive TAM follow up with customers?
+
+Yes
+
+Does this message require customers to take action?
+
+No
+
+Could that action taken by customers lead to cost implications?
+
+No
+
+Are Reminder MSAs planned for this notification?
+
+No
+
+Planned Reminder Dates, if known
+
+No Reminder Dates
+
+Is there a hard deadline for customers to complete specific action items?
+
+No
+
+Action items for Account Teams:
+
+If the affected customers below are not your customers, please contact the appropriate role-based alias to update the customer database. If you're no longer in this role, please forward this message to your backfill.
+After the MSA is sent, use go/msa-vault to review the customer email addresses that received the MSA. Refer to go/cloud-msa-vault for more information.
+
+List of your affected customers:
+
+Transurban Limited
+Broadcom Corporation
+Endeavour Group Limited
+Ingram Micro Inc.
+
+Thank you for your attention to these details. If you have questions/feedback about the MSA process, please share it at go/msa-questions.
+
+Customer message:
+
+Hello Cloud Interconnect customer,
+
+You are receiving this communication because one or more of your projects have Dedicated Interconnect connections in scope for this change.
+
+Beginning September 8, 2026, new 100G VLAN attachments will be provisioned only on MACsec-capable ports. Your existing attachments will continue to operate without change.
+
+What you need to know
+
+Key change: New 100G attachments require MACsec-capable ports starting September 8, 2026.
+
+Impacted customers/accounts:
+
+Your affected projects are listed below:
+
+${project.project_id}
+
+What you need to do
+
+Recommended for review:
+
+Review planned capacity: If you intend to add 100G attachments after September 8, 2026, confirm port availability in your colocation facility.
+Coordinate with your peer: MACsec-capable ports do not require MACsec to be enabled, but enabling it requires configuration on both ends.
+
+We're here to help
+
+Review the Dedicated Interconnect provisioning documentation for port requirements.
+
+If you have any questions or need help, contact Google Cloud Support.
+
+Thanks for choosing Cloud Interconnect.
+
+- The Google Cloud Team

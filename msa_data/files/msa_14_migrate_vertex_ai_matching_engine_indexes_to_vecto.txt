@@ -1,0 +1,29 @@
+Date: Mon, Jul 6, 2026 at 4:47 PM
+Subject: [Internal MSA Notification] [Action Required] Migrate Vertex AI Matching Engine indexes to Vector Search before Oct 30, 2026
+
+Hello,
+
+You are receiving this internal announcement email as you are subscribed to the cloud-product-notifications-announce Google group.
+
+TLDR: Legacy Matching Engine index endpoints are being retired. Desired outcome is that customers redeploy indexes on Vector Search and validate recall and latency before the cutoff.
+
+This communication has received final stakeholder approval and is scheduled for distribution on July 17, 2026.
+
+Please do not forward this email or the document linked directly to customers as it may contain some internal links or sensitive details.
+
+Key Details:
+MSA Bug ID	b/518664201
+Launch Owner	jrothstein - jrothstein@google.com
+MSA Doc	MSA Doc Link
+MSA Approvals	Approvals: Turbo Link
+Message Target Audience	
+The recipient list for this MSA communications was determined by jrothstein.
+Internal Audience
+External Audience
+Project Owners
+Billing Admins
+Customer MSA Subject	[Action Required] Migrate Vertex AI Matching Engine indexes to Vector Search before Oct 30, 2026
+Does this message require customers to take action, and could that action lead to cost implications?	Yes
+Are Reminder MSAs planned for this notification?	Yes
+Planned Reminder Dates, if known	Reminder 1: August 31, 2026
+Reminder 2: September 30, 2026
