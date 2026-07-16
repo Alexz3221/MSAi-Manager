@@ -11,6 +11,10 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from google.cloud import storage, bigquery
+
+_gcs = storage.Client()
+_bq = bigquery.Client()
 
 MSA_KEYWORDS_DIR = Path(__file__).parent / "msa_data" / "msa_keywords_cleaned"
 
@@ -105,9 +109,10 @@ DEADLINE_IN_SUBJECT = re.compile(
     r"([A-Z][a-z]{2,8}\.?\s+\d{1,2},\s+\d{4})")
 
 
-def parse_msa_file(filepath):
-    path = Path(filepath)
-    text = normalize(path.read_text(encoding="utf-8"))
+def parse_msa_file(bucket_name, blob_name):
+    blob = _gcs.bucket(bucket_name).blob(blob_name)
+    text = normalize(blob.download_as_text())
+    msa_id = Path(blob_name).stem   # same id derivation as before
 
     # ^ anchors so "Effective Date:" / "End Date:" can't hijack these
     sent = re.search(r"^Date:[ \t]*(.+)$", text, re.M)
@@ -165,8 +170,8 @@ def parse_msa_file(filepath):
         customers = [c.strip() for c in cm.group(1).strip().split("\n") if c.strip()]
 
     return {
-        "msa_id": path.stem,
-        "raw_msa_path": path.name,
+        "msa_id": msa_id,
+        "raw_msa_path": blob_name,
         "format": "account_team" if "Account Team MSA Notification" in text else "internal",
         "sent_date": to_iso(re.sub(r"^\w{3}, ", "", sent.group(1)).split(" at ")[0])
                      if sent else None,
@@ -184,24 +189,29 @@ def parse_msa_file(filepath):
         "_match_scope": scope,
     }
 
-
+BQ_TABLE = "sprinternship-bld-2026.msa_manager.msa_updates"
 def write_profile(profile):
-    MSA_KEYWORDS_DIR.mkdir(parents=True, exist_ok=True)
-    out = MSA_KEYWORDS_DIR / f"{profile['msa_id']}.json"
     # always write -- an unmatched MSA must be visible, not silently dropped
     if not profile["affected_services"]:
         print(f"WARN: no service matched in {profile['msa_id']}: "
               f"{profile['headline'][:60]!r}", file=sys.stderr)
-    out.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
-    return out
+    errors = _bq.insert_rows_json(BQ_TABLE, [profile])
+    if errors:
+        print(f"ERROR: failed to write {profile['msa_id']} to BigQuery: {errors}", file=sys.stderr)
+    return errors
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("usage: python3 msa_parser.py <file.txt> [...]", file=sys.stderr)
+        print("usage: python3 msa_parser.py <bucket-name> [prefix]", file=sys.stderr)
         sys.exit(1)
-    for f in sys.argv[1:]:
-        p = parse_msa_file(f)
+    bucket_name = sys.argv[1]
+    prefix = sys.argv[2] if len(sys.argv) > 2 else ""
+
+    for blob in _gcs.list_blobs(bucket_name, prefix=prefix):
+        if not blob.name.endswith(".txt"):
+            continue
+        p = parse_msa_file(bucket_name, blob.name)
         write_profile(p)
         svc = ", ".join(s["name"] for s in p["affected_services"]) or "!! NONE !!"
         print(f'{p["msa_id"][:24]:26} | {svc:34} | {p["effective_date"] or "-":10} | '
