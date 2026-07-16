@@ -39,17 +39,6 @@ a filterable web feed and can prepare notification email previews.
 | Cloud Logging / Monitoring | Centralize logs, errors, and service health | Possible |
 | Email provider or SMTP relay | Deliver reviewed customer notifications | Possible |
 
-One possible future flow is:
-
-```text
-Cloud Asset Inventory ----> customer profile ----+
-                                                |
-Raw MSA source -----------> MSA profile --------+--> BigQuery
-                                                |
-                                                +--> Cloud Run feed
-                                                |
-                                                +--> reviewed email notification
-```
 
 Cloud Storage could sit behind both raw-data inputs, while Pub/Sub or Cloud
 Scheduler could trigger parsing and notification steps. This is only a draft
