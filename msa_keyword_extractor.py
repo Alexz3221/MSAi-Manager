@@ -19,6 +19,7 @@ _bq = bigquery.Client()
 MSA_KEYWORDS_DIR = Path(__file__).parent / "msa_data" / "msa_keywords_cleaned"
 
 # canonical name -> surface forms seen in the wild
+#test commut
 SERVICE_ALIASES = {
     "apigee":                   ["apigee", "apigee hybrid", "apigee x", "apigee edge"],
     "artifact registry":        ["artifact registry"],
