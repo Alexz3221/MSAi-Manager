@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -30,6 +31,7 @@ class MsaProfile:
     affected_services: dict[str, set[str]]
     raw_msa_path: Path
     subject: str | None
+    headline: str | None
     date: str | None
     effective_date: str | None
     requires_customer_action: bool
@@ -93,15 +95,49 @@ def service_terms(service: dict[str, Any]) -> tuple[str, set[str]]:
     return normalize_term(name), {term for term in terms if term}
 
 
+def data_source() -> str:
+    source = os.environ.get("DATA_SOURCE", "local").strip().casefold()
+    if source not in {"local", "bigquery"}:
+        raise RuntimeError("DATA_SOURCE must be either 'local' or 'bigquery'.")
+    return source
+
+
+def resolve_data_path(value: Any, default_directory: Path, default_name: str) -> Path:
+    candidate = Path(str(value or default_name))
+    if candidate.is_absolute():
+        return candidate
+
+    root_relative = ROOT / candidate
+    if root_relative.exists() or candidate.parent != Path("."):
+        return root_relative
+    return default_directory / candidate.name
+
+
+def customer_records() -> list[dict[str, Any]]:
+    if data_source() == "bigquery":
+        from bigquery_data import load_customer_records
+
+        return load_customer_records()
+    return [read_json(path) for path in sorted(CUSTOMER_PROFILES_DIR.glob("*.json"))]
+
+
+def msa_records() -> list[dict[str, Any]]:
+    if data_source() == "bigquery":
+        from bigquery_data import load_msa_records
+
+        return load_msa_records()
+    return [read_json(path) for path in sorted(MSA_PROFILES_DIR.glob("*.json"))]
+
+
 def load_customer_profiles() -> dict[str, CustomerProfile]:
     profiles: dict[str, CustomerProfile] = {}
 
-    for json_path in sorted(CUSTOMER_PROFILES_DIR.glob("*.json")):
-        payload = read_json(json_path)
-        company_id = normalize_name(str(payload.get("company_id") or json_path.stem))
-        raw_customer_path = ROOT / str(
-            payload.get("raw_customer_path")
-            or CUSTOMER_RAW_DIR / f"{company_id}.txt"
+    for payload in customer_records():
+        company_id = normalize_name(str(payload["company_id"]))
+        raw_customer_path = resolve_data_path(
+            payload.get("raw_customer_path"),
+            CUSTOMER_RAW_DIR,
+            f"{company_id}.txt",
         )
         services = dict(service_terms(service) for service in payload.get("services", []))
         profiles[company_id] = CustomerProfile(
@@ -118,12 +154,12 @@ def load_customer_profiles() -> dict[str, CustomerProfile]:
 def load_msa_profiles() -> dict[str, MsaProfile]:
     profiles: dict[str, MsaProfile] = {}
 
-    for json_path in sorted(MSA_PROFILES_DIR.glob("*.json")):
-        payload = read_json(json_path)
-        msa_id = str(payload.get("msa_id") or json_path.stem.removesuffix("_keywords"))
-        raw_msa_path = ROOT / str(
-            payload.get("raw_msa_path")
-            or RAW_MSA_DIR / f"{msa_id}.txt"
+    for payload in msa_records():
+        msa_id = str(payload["msa_id"])
+        raw_msa_path = resolve_data_path(
+            payload.get("raw_msa_path"),
+            RAW_MSA_DIR,
+            f"{msa_id}.txt",
         )
         affected_services = dict(
             service_terms(service) for service in payload.get("affected_services", [])
@@ -133,7 +169,8 @@ def load_msa_profiles() -> dict[str, MsaProfile]:
             affected_services=affected_services,
             raw_msa_path=raw_msa_path,
             subject=payload.get("subject"),
-            date=payload.get("date"),
+            headline=payload.get("headline"),
+            date=payload.get("sent_date") or payload.get("date"),
             effective_date=payload.get("effective_date"),
             requires_customer_action=bool(payload.get("requires_customer_action", False)),
         )
@@ -198,6 +235,13 @@ def raw_summary(raw_text: str) -> str:
             return line.removeprefix("TLDR:").strip()
 
     return "No summary available."
+
+
+def profile_summary(msa_profile: MsaProfile, raw_text: str) -> str:
+    summary = raw_summary(raw_text)
+    if summary != "No summary available.":
+        return summary
+    return msa_profile.headline or summary
 
 
 def action_items(lines: list[str], max_items: int = 3) -> list[str]:
@@ -306,7 +350,7 @@ def build_matches(company_name: str) -> list[MsaMatch]:
                 effective_date=msa_profile.effective_date,
                 requires_customer_action=msa_profile.requires_customer_action,
                 matching_services=matching_services,
-                summary=raw_summary(raw_text),
+                summary=profile_summary(msa_profile, raw_text),
                 actions=action_items(section_lines(raw_text, "WHAT YOU NEED TO DO")),
                 raw_msa_path=msa_profile.raw_msa_path,
             )
@@ -372,7 +416,7 @@ def build_feed(
                 requires_customer_action=msa_profile.requires_customer_action,
                 affected_services=sorted(msa_profile.affected_services),
                 impacted_companies=impacts,
-                summary=raw_summary(raw_text),
+                summary=profile_summary(msa_profile, raw_text),
                 actions=action_items(section_lines(raw_text, "WHAT YOU NEED TO DO")),
                 raw_msa_path=msa_profile.raw_msa_path,
             )
