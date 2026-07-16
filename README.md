@@ -139,16 +139,3 @@ Example filter:
 ```text
 /api/feed?company=apple&service=bigquery&requires_action=true
 ```
-
-## Draft next steps
-
-- Decide whether raw files belong in Cloud Storage or remain packaged with the
-  service.
-- Define an ingestion trigger: manual, scheduled, or event-driven.
-- Decide how customer contacts and notification approvals should be managed.
-- Add repeatable BigQuery table creation and schema management.
-- Add automated tests before treating the prototype as production-ready.
-- Configure local ADC when real local BigQuery testing is needed.
-
-This outline should evolve as the team chooses which possible services belong
-in the final design.
