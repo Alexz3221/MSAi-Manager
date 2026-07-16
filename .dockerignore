@@ -14,3 +14,9 @@ logs/
 output/
 outputs/
 *.log
+.coverage
+htmlcov/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
