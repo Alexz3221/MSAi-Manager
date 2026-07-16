@@ -1,6 +1,7 @@
 # Local secrets and environment files
 .env
 .env.*
+!.env.example
 
 # Python caches and build output
 __pycache__/
@@ -23,6 +24,8 @@ env/
 Thumbs.db
 .idea/
 .vscode/
+*.swp
+*~
 
 # Local runtime output
 logs/
