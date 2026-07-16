@@ -1,1 +1,1 @@
-# No third-party Python dependencies yet.
+google-cloud-bigquery>=3.25,<4
