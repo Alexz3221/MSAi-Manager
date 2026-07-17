@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import os
+from pathlib import Path
 from typing import Any, Protocol
 
+from dotenv import load_dotenv
+
 from . import query
+
+
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "sprinternship-bld-2026")
