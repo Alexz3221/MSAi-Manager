@@ -66,6 +66,53 @@ class RequestLoggingTests(unittest.TestCase):
         self.assertIn("JSONDecodeError", logs)
         self.assertIn("test-post-trace", logs)
 
+    def test_john_endpoint_returns_chat_payload(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/john",
+            data=json.dumps(
+                {
+                    "message": "What affects me?",
+                    "user_id": "browser-user",
+                    "session_id": "existing-session",
+                }
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        expected = {
+            "session_id": "existing-session",
+            "reply": "One notice matches.",
+            "tools": ["find_msas_affecting_my_projects"],
+        }
+
+        with patch.object(app.JOHN_RUNTIME, "chat", return_value=expected) as chat:
+            response = urlopen(request, timeout=5)
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(json.loads(response.read()), expected)
+        chat.assert_called_once_with(
+            message="What affects me?",
+            user_id="browser-user",
+            session_id="existing-session",
+        )
+
+    def test_john_endpoint_rejects_an_empty_message(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/john",
+            data=b'{"message":""}',
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        with self.assertRaises(HTTPError) as raised:
+            urlopen(request, timeout=5)
+
+        self.assertEqual(raised.exception.code, 400)
+        self.assertEqual(
+            json.loads(raised.exception.read()),
+            {"error": "Message is required."},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

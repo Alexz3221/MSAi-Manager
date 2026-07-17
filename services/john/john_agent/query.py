@@ -2,7 +2,6 @@
 import sqlite3, pathlib, datetime, collections
 
 DB = pathlib.Path(__file__).parent / "msa.db"
-TODAY = datetime.date(2026, 7, 16)
 
 # One row per (notice, matched project). Grouping happens in Python -- see notes.
 JOIN_SQL = """
@@ -28,7 +27,8 @@ WHERE n.status = 'published'
 """
 
 
-def find_msas(principal, lookback_days=90, product=None, today=TODAY):
+def find_msas(principal, lookback_days=90, product=None, today=None):
+    today = today or datetime.date.today()
     con = sqlite3.connect(DB)
     con.row_factory = sqlite3.Row
     rows = con.execute(JOIN_SQL, {
