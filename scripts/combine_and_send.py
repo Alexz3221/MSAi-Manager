@@ -9,10 +9,10 @@ from email.message import EmailMessage
 from html import escape
 from pathlib import Path
 
-from chatbot.john import build_matches, load_customer_profiles
+from msai_core.matching import build_matches, load_customer_profiles
 
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = ROOT / "outputs" / "email_previews"
 DEFAULT_TEST_RECIPIENTS = ["azhou@gccsprinternships.com"]
 DOTENV_PATH = ROOT / ".env"

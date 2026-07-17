@@ -1,0 +1,2 @@
+google-cloud-aiplatform[agent_engines,adk]>=1.112,<2
+google-cloud-bigquery>=3.25,<4

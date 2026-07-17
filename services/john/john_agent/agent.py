@@ -5,8 +5,6 @@ import os
 from typing import Any, Protocol
 
 from . import query
-from .matching import *
-from .matching import __all__ as _matching_exports
 
 
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "sprinternship-bld-2026")
@@ -109,7 +107,6 @@ if __name__ == "__main__":
 
 
 __all__ = [
-    *_matching_exports,
     "LOCATION",
     "MODEL",
     "PRINCIPAL",

@@ -7,7 +7,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from unittest.mock import patch
 
-import app
+from services.web import app
 
 
 class RequestLoggingTests(unittest.TestCase):
