@@ -31,7 +31,8 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
             self.assertEqual(bigquery_data.load_customer_records(), sentinel)
 
         sql = query.call_args.args[0]
-        self.assertIn("TRIM(project_name)", sql)
+        self.assertIn("TRIM(project) AS project_name", sql)
+        self.assertNotIn("TRIM(project_name)", sql)
         self.assertIn("project_name AS company_id", sql)
         self.assertIn("STRUCT(service AS name", sql)
         self.assertIn("GROUP BY project_name", sql)
