@@ -1,36 +1,31 @@
-import asyncio, os
+from __future__ import annotations
 
-os.environ["GOOGLE_CLOUD_PROJECT"] = "sprinternship-bld-2026"
-os.environ["GOOGLE_CLOUD_LOCATION"] = "global"
-os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "TRUE"
+import asyncio
+import os
+from typing import Any, Protocol
 
-from google.adk.agents import Agent
-from google.adk.tools.tool_context import ToolContext
-from vertexai import agent_engines
+from . import query
+from .matching import *
+from .matching import __all__ as _matching_exports
 
-import query
 
-# The signed-in user. In prod this comes from a verified IAP assertion and is
-# written into session state server-side. Hardcoded here for local dev only.
-PRINCIPAL = "usagi@example.com"
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "sprinternship-bld-2026")
+LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
+MODEL = os.environ.get("JOHN_MODEL", "gemini-3.5-flash")
+PRINCIPAL = os.environ.get("JOHN_PRINCIPAL", "usagi@example.com")
+USER_ID = os.environ.get("JOHN_USER_ID", "088")
+
+
+class ToolContextLike(Protocol):
+    state: dict[str, Any]
 
 
 def find_msas_affecting_my_projects(
-    tool_context: ToolContext,
+    tool_context: ToolContextLike,
     lookback_days: int = 90,
     product: str | None = None,
-) -> dict:
-    """Finds published MSA notices that match resources in the caller's own projects.
-
-    Use this for any question about which notices affect the user, what they need
-    to migrate, or what deadlines are coming up. Results are already restricted to
-    projects the user has access to. An empty list is a valid answer meaning
-    nothing affects them.
-
-    Args:
-        lookback_days: How far back to look for published notices. Defaults to 90.
-        product: Optional exact product filter, e.g. 'Cloud SQL'. Omit to search all.
-    """
+) -> dict[str, Any]:
+    """Find published MSA notices matching projects available to the caller."""
     principal = tool_context.state.get("principal_email", PRINCIPAL)
     return query.find_msas(principal, lookback_days=lookback_days, product=product)
 
@@ -48,47 +43,80 @@ Rules:
 - Never state a deadline, migration target, or model version the tool did not return.
 """
 
-agent = Agent(
-    model="gemini-3.5-flash",
-    name="msa_advisor",
-    instruction=SYSTEM,
-    tools=[find_msas_affecting_my_projects],
-)
 
-app = agent_engines.AdkApp(agent=agent)
+def create_agent_app():
+    """Build John's ADK app only when the conversational agent is requested."""
+    os.environ.setdefault("GOOGLE_CLOUD_PROJECT", PROJECT_ID)
+    os.environ.setdefault("GOOGLE_CLOUD_LOCATION", LOCATION)
+    os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "TRUE")
 
-USER_ID = "088"
+    from google.adk.agents import Agent
+    import vertexai
+    from vertexai import agent_engines
 
-async def main():
-    session = await app.async_create_session(user_id=USER_ID)
-    session_id = session["id"] if isinstance(session, dict) else session.id
+    vertexai.init(project=PROJECT_ID, location=LOCATION)
+    agent = Agent(
+        model=MODEL,
+        name="msa_advisor",
+        instruction=SYSTEM,
+        tools=[find_msas_affecting_my_projects],
+    )
+    return agent_engines.AdkApp(agent=agent)
 
+
+async def agent_main() -> None:
+    app = None
+    session_id = None
     print("msa advisor — 'quit' or ctrl-d to exit\n")
     while True:
         try:
-            msg = input("ask: ").strip()
+            message = input("ask: ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nbye")
             break
 
-        if not msg:
+        if not message:
             continue
-        if msg.lower() in {"quit", "exit", "q"}:
+        if message.lower() in {"quit", "exit", "q"}:
             break
 
         try:
+            if app is None:
+                app = create_agent_app()
+                session = await app.async_create_session(user_id=USER_ID)
+                session_id = session["id"] if isinstance(session, dict) else session.id
+
             async for event in app.async_stream_query(
                 user_id=USER_ID,
                 session_id=session_id,
-                message=msg,
+                message=message,
             ):
                 for part in event.get("content", {}).get("parts", []):
                     if "function_call" in part:
-                        fc = part["function_call"]
-                        print(f"[tool] {fc['name']}({fc['args']})")
+                        function_call = part["function_call"]
+                        print(
+                            f"[tool] {function_call['name']}"
+                            f"({function_call['args']})"
+                        )
                     elif "text" in part:
                         print(f"\n{part['text']}\n")
-        except Exception as e:
-            print(f"[error] {type(e).__name__}: {e}\n")
+        except Exception as exc:
+            print(f"[error] {type(exc).__name__}: {exc}\n")
 
-asyncio.run(main())
+
+if __name__ == "__main__":
+    asyncio.run(agent_main())
+
+
+__all__ = [
+    *_matching_exports,
+    "LOCATION",
+    "MODEL",
+    "PRINCIPAL",
+    "PROJECT_ID",
+    "SYSTEM",
+    "USER_ID",
+    "agent_main",
+    "create_agent_app",
+    "find_msas_affecting_my_projects",
+]

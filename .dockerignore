@@ -14,6 +14,7 @@ logs/
 output/
 outputs/
 *.log
+chatbot/*.db
 .coverage
 htmlcov/
 .DS_Store

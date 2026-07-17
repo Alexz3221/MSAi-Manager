@@ -6,14 +6,11 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from msa_chatbot import (
+from chatbot.john import (
     build_feed,
     load_customer_profiles,
     load_msa_profiles,
 )
-
-from msa_keyword_extractor import parse_msa_file, write_profile
-
 
 HOST = "0.0.0.0"
 PORT = int(os.environ.get("PORT", "8080"))
@@ -529,8 +526,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         self.send_json(404, {"error": "Not found"})
-        
-    
+
     def do_POST(self) -> None:
         parsed_url = urlparse(self.path)
 
@@ -555,6 +551,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
+            from msa_keyword_extractor import parse_msa_file, write_profile
+
             profile = parse_msa_file(bucket_name, blob_name)
             errors = write_profile(profile)
 
@@ -568,7 +566,6 @@ class RequestHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json(500, {"error": str(e)})
 
-   
 
     def log_message(self, format: str, *args: object) -> None:
         return

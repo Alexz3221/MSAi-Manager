@@ -178,7 +178,7 @@ def build_profile(account_name: str, client_id: str) -> ClientProfile:
     return ClientProfile(account=account_name, client_id=client_id, active_services=services)
 
 def normalize_service_name(service: str) -> str:
-    """Match the casefold-on-read convention used by combine_and_send.py / msa_chatbot.py."""
+    """Match the casefold-on-read convention used by the chatbot and email builder."""
     return service.strip().casefold()
  
 def write_keyword_json(profile: ClientProfile) -> Path:
@@ -231,7 +231,7 @@ def generate_test_fixtures() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Pull a client's active GCP services and write files that "
-        "combine_and_send.py / msa_chatbot.py can match against."
+        "combine_and_send.py / chatbot/matching.py can match against."
     )
     parser.add_argument("--client-id", help="Client/project ID to look up.")
     parser.add_argument(

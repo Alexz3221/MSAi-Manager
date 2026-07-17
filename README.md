@@ -20,6 +20,8 @@ a filterable web feed and can prepare notification email previews.
 - BigQuery project: `sprinternship-bld-2026`
 - Dataset: `msa_manager`
 - Tables: `customer_profiles` and `msa_updates`
+- `customer_profiles` stores flat `project_name`, `service`, and `raw_uri` rows;
+  the application groups them into project profiles when reading.
 - The tables may be empty during development, in which case the feed correctly
   returns zero results.
 - Raw text and generated output still use local files; Cloud Storage support has
@@ -49,9 +51,10 @@ architecture; the current code does not yet connect those services.
 | File | Purpose |
 | --- | --- |
 | `app.py` | Web server, UI, and JSON endpoints |
-| `msa_chatbot.py` | Matching, filtering, and command-line lookup |
+| `chatbot/john.py` | John conversational agent and matching compatibility API |
+| `chatbot/matching.py` | Deterministic matching, filtering, and feed generation |
+| `chatbot/query.py` | Scoped relational join used by John's prototype ADK tool |
 | `bigquery_data.py` | BigQuery data reader |
-| `seed_bigquery.py` | Loads local cleaned JSON into existing BigQuery tables |
 | `msa_keyword_extractor.py` | Converts raw MSA text into cleaned JSON |
 | `service_pull.py` | Experiments with Cloud Asset Inventory customer profiles |
 | `combine_and_send.py` | Builds email previews and optionally uses SMTP |
@@ -80,6 +83,18 @@ python app.py
 
 Open <http://localhost:8080>.
 
+John's ADK prototype uses a local SQLite fixture for its scoped project/notice
+join. Build and verify that fixture before starting the interactive agent:
+
+```powershell
+python -m chatbot.seed
+python -m chatbot.query
+python -m chatbot.john
+```
+
+The first two commands do not require Google credentials. The interactive
+agent uses Vertex AI and therefore requires Application Default Credentials.
+
 ## Data-source settings
 
 Local JSON is the default. For BigQuery:
@@ -99,19 +114,9 @@ Credentials. Cloud Run receives credentials from its assigned service account;
 local development requires separately configured credentials.
 
 The tracked `.env.example` lists the main settings. The web app reads variables
-from the process environment; it does not automatically load `.env`.
-
-## Seed the BigQuery prototype
-
-The dataset and tables must already exist. To replace their contents with the
-current local cleaned JSON:
-
-```powershell
-python seed_bigquery.py --replace
-```
-
-Omit `--replace` only when rows should be appended. Review local JSON changes
-before using replacement mode because it truncates both target tables.
+from the process environment; it does not automatically load `.env`. BigQuery
+tables are populated by external ingestion pipelines rather than this
+application.
 
 ## Useful endpoints
 
