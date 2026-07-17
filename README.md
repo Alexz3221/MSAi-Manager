@@ -131,8 +131,8 @@ gcloud projects add-iam-policy-binding sprinternship-bld-2026 `
 John currently uses the packaged demo SQLite fixture and in-memory conversation
 sessions. A session can be lost whenever Cloud Run replaces the instance, and
 the public endpoint still needs end-user authentication before production use.
-The app applies an in-memory sliding-window limit of five requests per client
-every five minutes and 30 total requests per hour by default. These values are
+The app applies an in-memory sliding-window limit of 25 requests per client
+every five minutes and 300 total requests per hour by default. These values are
 configurable with the `JOHN_RATE_LIMIT_*` settings in `.env.example`. The
 existing GitHub build trigger deploys both tools together.
 

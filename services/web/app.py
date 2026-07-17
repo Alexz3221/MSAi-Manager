@@ -42,12 +42,12 @@ def positive_int_setting(name: str, default: int) -> int:
 
 
 JOHN_RATE_LIMITER = JohnRateLimiter(
-    per_client_limit=positive_int_setting("JOHN_RATE_LIMIT_PER_CLIENT", 5),
+    per_client_limit=positive_int_setting("JOHN_RATE_LIMIT_PER_CLIENT", 25),
     per_client_window_seconds=positive_int_setting(
         "JOHN_RATE_LIMIT_CLIENT_WINDOW_SECONDS",
         300,
     ),
-    global_limit=positive_int_setting("JOHN_RATE_LIMIT_GLOBAL", 30),
+    global_limit=positive_int_setting("JOHN_RATE_LIMIT_GLOBAL", 300),
     global_window_seconds=positive_int_setting(
         "JOHN_RATE_LIMIT_GLOBAL_WINDOW_SECONDS",
         3_600,
