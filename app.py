@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -14,6 +15,11 @@ from chatbot.john import (
 
 HOST = "0.0.0.0"
 PORT = int(os.environ.get("PORT", "8080"))
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+LOGGER = logging.getLogger(__name__)
 
 
 def bool_param(value: str | None) -> bool | None:
@@ -481,6 +487,14 @@ def html_page() -> str:
 
 
 class RequestHandler(BaseHTTPRequestHandler):
+    def log_exception(self, method: str) -> None:
+        LOGGER.exception(
+            "Unhandled %s request error path=%s trace=%s",
+            method,
+            self.path,
+            self.headers.get("X-Cloud-Trace-Context", "unavailable"),
+        )
+
     def send_json(self, status: int, payload: dict[str, object]) -> None:
         body = json.dumps(payload, indent=2).encode("utf-8")
         self.send_response(status)
@@ -498,6 +512,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:
+        try:
+            self.handle_get()
+        except Exception:
+            self.log_exception("GET")
+            self.send_json(503, {"error": "Service unavailable"})
+
+    def handle_get(self) -> None:
         parsed_url = urlparse(self.path)
         query = parse_qs(parsed_url.query)
 
@@ -557,14 +578,21 @@ class RequestHandler(BaseHTTPRequestHandler):
             errors = write_profile(profile)
 
             if errors:
-                self.send_json(500, {"error": str(errors)})
+                LOGGER.error(
+                    "BigQuery insert failed path=%s trace=%s errors=%r",
+                    self.path,
+                    self.headers.get("X-Cloud-Trace-Context", "unavailable"),
+                    errors,
+                )
+                self.send_json(500, {"error": "Failed to write MSA profile"})
                 return
 
             self.send_response(204)
             self.end_headers()
 
-        except Exception as e:
-            self.send_json(500, {"error": str(e)})
+        except Exception:
+            self.log_exception("POST")
+            self.send_json(500, {"error": "Failed to process Pub/Sub message"})
 
 
     def log_message(self, format: str, *args: object) -> None:
