@@ -1,4 +1,4 @@
-"""MSAi matching and conversational-agent package."""
+"""Shared data models and deterministic MSA matching logic."""
 
 from .matching import (
     CustomerProfile,

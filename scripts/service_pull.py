@@ -6,7 +6,7 @@ from pathlib import Path
 
 from google.cloud import asset_v1 # tbd on this, but API is active now
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parents[1]
 CUSTOMER_RAW_DIR = ROOT / "customer_data" / "raw"
 CUSTOMER_KEYWORDS_DIR = ROOT / "customer_data" / "customer_keywords_cleaned"
 
@@ -120,7 +120,7 @@ def query_services(client_id: str) -> list[str]:
                 return []
             for proj_id in project_ids:
                 try:
-                     assets_response = client.list_assets(
+                    assets_response = client.list_assets(
                         request={
                             "parent": f"projects/{proj_id}",
                             "read_time": None,
@@ -231,7 +231,7 @@ def generate_test_fixtures() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Pull a client's active GCP services and write files that "
-        "combine_and_send.py / chatbot/matching.py can match against."
+        "scripts/combine_and_send.py and msai_core.matching can match against."
     )
     parser.add_argument("--client-id", help="Client/project ID to look up.")
     parser.add_argument(

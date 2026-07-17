@@ -24,8 +24,8 @@ a filterable web feed and can prepare notification email previews.
   the application groups them into project profiles when reading.
 - The tables may be empty during development, in which case the feed correctly
   returns zero results.
-- Raw text and generated output still use local files; Cloud Storage support has
-  not been implemented.
+- Local fixtures remain in the repository; the deployed Pub/Sub ingestion path
+  can read new raw MSA text from Cloud Storage.
 
 ## Draft service outline
 
@@ -34,30 +34,36 @@ a filterable web feed and can prepare notification email previews.
 | Cloud Run | Host the web UI and API | In use |
 | BigQuery | Store cleaned customer and MSA profiles | In use |
 | Cloud Asset Inventory | Discover services used by customer projects | Experimental script |
-| Cloud Storage | Store raw MSA files, raw customer profiles, and generated previews | Possible |
+| Cloud Storage | Supply raw MSA files to the ingestion path | In use |
 | Secret Manager | Store SMTP or external-service credentials | Possible |
-| Pub/Sub | Trigger parsing or notification jobs when new data arrives | Possible |
+| Pub/Sub | Trigger MSA parsing when new Cloud Storage objects arrive | In use |
 | Cloud Scheduler | Run periodic imports and notification checks | Possible |
 | Cloud Logging / Monitoring | Centralize logs, errors, and service health | Possible |
 | Email provider or SMTP relay | Deliver reviewed customer notifications | Possible |
 
 
-Cloud Storage could sit behind both raw-data inputs, while Pub/Sub or Cloud
-Scheduler could trigger parsing and notification steps. This is only a draft
-architecture; the current code does not yet connect those services.
+Cloud Storage and Pub/Sub support the current MSA ingestion path. Cloud
+Scheduler and broader notification automation remain planning ideas.
 
 ## Repository guide
 
-| File | Purpose |
-| --- | --- |
-| `app.py` | Web server, UI, and JSON endpoints |
-| `chatbot/john.py` | John conversational agent and matching compatibility API |
-| `chatbot/matching.py` | Deterministic matching, filtering, and feed generation |
-| `chatbot/query.py` | Scoped relational join used by John's prototype ADK tool |
-| `bigquery_data.py` | BigQuery data reader |
-| `msa_keyword_extractor.py` | Converts raw MSA text into cleaned JSON |
-| `service_pull.py` | Experiments with Cloud Asset Inventory customer profiles |
-| `combine_and_send.py` | Builds email previews and optionally uses SMTP |
+```text
+src/msai_core/                    shared BigQuery and deterministic matching code
+services/web/                     deployed dashboard and JSON API
+services/john/john_agent/         John conversational-agent prototype
+scripts/                          ingestion, asset, and notification commands
+sql/                              local demo and future warehouse schemas
+tests/                            unit and request-level tests
+customer_data/                    local customer fixtures
+msa_data/                         local MSA fixtures
+app.py                            compatibility entry point used by Cloud Run
+```
+
+The web service and John both consume `msai_core`; neither service imports the
+other. Each deployable service has its own requirements file. The root
+`requirements.txt` installs the complete development toolset, while the root
+`Dockerfile` installs only `services/web/requirements.txt` for the existing
+Cloud Run deployment.
 
 Data is organized under:
 
@@ -76,6 +82,7 @@ Python 3.12 is recommended.
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+python -m pip install -e . --no-deps
 
 $env:DATA_SOURCE = "local"
 python app.py
@@ -87,9 +94,9 @@ John's ADK prototype uses a local SQLite fixture for its scoped project/notice
 join. Build and verify that fixture before starting the interactive agent:
 
 ```powershell
-python -m chatbot.seed
-python -m chatbot.query
-python -m chatbot.john
+python -m scripts.seed_john_demo
+python -m services.john.john_agent.query
+python -m services.john.john_agent.agent
 ```
 
 The first two commands do not require Google credentials. The interactive
@@ -117,6 +124,20 @@ The tracked `.env.example` lists the main settings. The web app reads variables
 from the process environment; it does not automatically load `.env`. BigQuery
 tables are populated by external ingestion pipelines rather than this
 application.
+
+## Operational commands
+
+Run repository scripts as modules from the repository root so imports and data
+paths remain consistent:
+
+```powershell
+python -m scripts.service_pull --help
+python -m scripts.combine_and_send --help
+```
+
+`scripts.asset_checker` and `scripts.msa_keyword_extractor` currently perform
+work when imported and should only be run intentionally. Generated output stays
+under the root data or ignored `outputs/` directories.
 
 ## Useful endpoints
 
