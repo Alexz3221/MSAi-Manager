@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 from unittest.mock import patch
 
 from services.web import app
+from services.web.rate_limit import RateLimitDecision
 
 
 class RequestLoggingTests(unittest.TestCase):
@@ -76,7 +77,10 @@ class RequestLoggingTests(unittest.TestCase):
                     "session_id": "existing-session",
                 }
             ).encode(),
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "X-Forwarded-For": "203.0.113.10, 10.0.0.1",
+            },
             method="POST",
         )
         expected = {
@@ -85,11 +89,19 @@ class RequestLoggingTests(unittest.TestCase):
             "tools": ["find_msas_affecting_my_projects"],
         }
 
-        with patch.object(app.JOHN_RUNTIME, "chat", return_value=expected) as chat:
+        with (
+            patch.object(
+                app.JOHN_RATE_LIMITER,
+                "check",
+                return_value=RateLimitDecision(allowed=True),
+            ) as rate_limit,
+            patch.object(app.JOHN_RUNTIME, "chat", return_value=expected) as chat,
+        ):
             response = urlopen(request, timeout=5)
 
         self.assertEqual(response.status, 200)
         self.assertEqual(json.loads(response.read()), expected)
+        rate_limit.assert_called_once_with("203.0.113.10")
         chat.assert_called_once_with(
             message="What affects me?",
             user_id="browser-user",
@@ -112,6 +124,38 @@ class RequestLoggingTests(unittest.TestCase):
             json.loads(raised.exception.read()),
             {"error": "Message is required."},
         )
+
+    def test_john_endpoint_returns_retry_after_when_rate_limited(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/john",
+            data=b'{"message":"Hello"}',
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        decision = RateLimitDecision(
+            allowed=False,
+            retry_after_seconds=45,
+            reason="global",
+        )
+
+        with (
+            patch.object(app.JOHN_RATE_LIMITER, "check", return_value=decision),
+            patch.object(app.JOHN_RUNTIME, "chat") as chat,
+            self.assertLogs(app.LOGGER.name, level="WARNING"),
+        ):
+            with self.assertRaises(HTTPError) as raised:
+                urlopen(request, timeout=5)
+
+        self.assertEqual(raised.exception.code, 429)
+        self.assertEqual(raised.exception.headers["Retry-After"], "45")
+        self.assertEqual(
+            json.loads(raised.exception.read()),
+            {
+                "error": "John is receiving too many requests. Try again shortly.",
+                "retry_after_seconds": 45,
+            },
+        )
+        chat.assert_not_called()
 
 
 if __name__ == "__main__":

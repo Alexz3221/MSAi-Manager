@@ -16,6 +16,7 @@ from msai_core.matching import (
     load_msa_profiles,
 )
 from services.john.john_agent.runtime import JohnRuntime
+from services.web.rate_limit import JohnRateLimiter
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
@@ -28,6 +29,30 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 JOHN_RUNTIME = JohnRuntime()
 MAX_JOHN_MESSAGE_LENGTH = 4_000
+
+
+def positive_int_setting(name: str, default: int) -> int:
+    try:
+        value = int(os.environ.get(name, default))
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be a positive integer.") from exc
+    if value <= 0:
+        raise RuntimeError(f"{name} must be a positive integer.")
+    return value
+
+
+JOHN_RATE_LIMITER = JohnRateLimiter(
+    per_client_limit=positive_int_setting("JOHN_RATE_LIMIT_PER_CLIENT", 5),
+    per_client_window_seconds=positive_int_setting(
+        "JOHN_RATE_LIMIT_CLIENT_WINDOW_SECONDS",
+        300,
+    ),
+    global_limit=positive_int_setting("JOHN_RATE_LIMIT_GLOBAL", 30),
+    global_window_seconds=positive_int_setting(
+        "JOHN_RATE_LIMIT_GLOBAL_WINDOW_SECONDS",
+        3_600,
+    ),
+)
 
 
 def bool_param(value: str | None) -> bool | None:
@@ -670,7 +695,12 @@ def html_page() -> str:
           })
         });
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "John is unavailable.");
+        if (!response.ok) {
+          const retry = payload.retry_after_seconds
+            ? ` Try again in ${payload.retry_after_seconds} seconds.`
+            : "";
+          throw new Error((payload.error || "John is unavailable.") + retry);
+        }
         johnSessionId = payload.session_id;
         appendMessage("john", payload.reply, payload.tools || []);
         johnStatus.textContent = "John is ready for a follow-up question.";
@@ -805,13 +835,28 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.headers.get("X-Cloud-Trace-Context", "unavailable"),
         )
 
-    def send_json(self, status: int, payload: dict[str, object]) -> None:
+    def send_json(
+        self,
+        status: int,
+        payload: dict[str, object],
+        headers: dict[str, str] | None = None,
+    ) -> None:
         body = json.dumps(payload, indent=2).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
+
+    def client_key(self) -> str:
+        forwarded_for = self.headers.get("X-Forwarded-For", "")
+        if forwarded_for:
+            forwarded_client = forwarded_for.split(",", 1)[0].strip()
+            if forwarded_client:
+                return forwarded_client
+        return str(self.client_address[0])
 
     def send_html(self, html: str) -> None:
         body = html.encode("utf-8")
@@ -884,6 +929,25 @@ class RequestHandler(BaseHTTPRequestHandler):
                     raise ValueError("User ID must be between 1 and 128 characters.")
                 if session_id and len(session_id) > 128:
                     raise ValueError("Session ID must be 128 characters or fewer.")
+
+                rate_limit = JOHN_RATE_LIMITER.check(self.client_key())
+                if not rate_limit.allowed:
+                    retry_after = str(rate_limit.retry_after_seconds)
+                    LOGGER.warning(
+                        "John rate limit reached reason=%s retry_after=%s trace=%s",
+                        rate_limit.reason,
+                        retry_after,
+                        self.headers.get("X-Cloud-Trace-Context", "unavailable"),
+                    )
+                    self.send_json(
+                        429,
+                        {
+                            "error": "John is receiving too many requests. Try again shortly.",
+                            "retry_after_seconds": rate_limit.retry_after_seconds,
+                        },
+                        headers={"Retry-After": retry_after},
+                    )
+                    return
 
                 self.send_json(
                     200,
