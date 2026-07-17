@@ -1,0 +1,422 @@
+[
+    {
+        "project": "1053168925742",
+        "service": "cloud logging",
+        "raw_uri": "//logging.googleapis.com/projects/1053168925742/sinks/_Default"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/bigquerydatatransfer.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "cloud logging",
+        "raw_uri": "//logging.googleapis.com/projects/1053168925742/locations/global/buckets/_Default"
+    },
+    {
+        "project": "1053168925742",
+        "service": "cloud logging",
+        "raw_uri": "//logging.googleapis.com/projects/1053168925742/locations/global/buckets/_Required"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy/dockerImages/msai-manager%2Fmsai-manager@sha256:a1fc261860183d2cb3f5d421702e2ed20e4b1f49b6c21f5513004e8c60f64e59"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy/dockerImages/msai-manager%2Fmsai-manager@sha256:7c8c9a03a73d979c909375039b01ee5123b07fb838c24fdd32a80727871bfde3"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00013-64x"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy/dockerImages/msai-manager%2Fmsai-manager@sha256:386c1c64ae2be1834880fa189b0369a892f67923acdf80c05860671abbf805b1"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00012-8nz"
+    },
+    {
+        "project": "1053168925742",
+        "service": "vertex ai",
+        "raw_uri": "//aiplatform.googleapis.com/projects/1053168925742/locations/us-west1/reasoningEngines/5653046675233570816"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy/dockerImages/msai-manager%2Fmsai-manager@sha256:66a1d345da1650ffdd206e2245fb8bc69c47d82c89ccd39a04859edda77e98c0"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00011-48t"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy/dockerImages/msai-manager%2Fmsai-manager@sha256:4536c67e754e43001fe8b0d0b95284ef0d1c9d49c9c1f77fd4ab3d1cab2321cc"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00010-jq6"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy/dockerImages/msai-manager%2Fmsai-manager@sha256:41e43b710da8ffd3870e492b847434cc6f3ed753a0c591bd4bd64f813e20a278"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00009-h4v"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy/dockerImages/msai-manager%2Fmsai-manager@sha256:f3f755c589c9800a0c639b88249be0026abcd47438d69c4c3751bf769eed1e95"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00008-txx"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "Unknown Service",
+        "raw_uri": "//dataplex.googleapis.com/projects/sprinternship-bld-2026/locations/global/entryGroups/@spanner"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "Unknown Service",
+        "raw_uri": "//dataplex.googleapis.com/projects/sprinternship-bld-2026/locations/global/entryGroups/@analyticshub"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "Unknown Service",
+        "raw_uri": "//dataplex.googleapis.com/projects/sprinternship-bld-2026/locations/global/entryGroups/@bigquery"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "Unknown Service",
+        "raw_uri": "//dataplex.googleapis.com/projects/sprinternship-bld-2026/locations/global/entryGroups/@storage"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "Unknown Service",
+        "raw_uri": "//dataplex.googleapis.com/projects/sprinternship-bld-2026/locations/global/entryGroups/@vertexai"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "Unknown Service",
+        "raw_uri": "//dataplex.googleapis.com/projects/sprinternship-bld-2026/locations/global/entryGroups/@pubsub"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "Unknown Service",
+        "raw_uri": "//dataplex.googleapis.com/projects/sprinternship-bld-2026/locations/global/entryGroups/@bigtable"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "Unknown Service",
+        "raw_uri": "//dataplex.googleapis.com/projects/sprinternship-bld-2026/locations/global/entryGroups/@dataprocmetastore"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy/dockerImages/msai-manager%2Fmsai-manager@sha256:fda265bd5830123a128359da0c92feb2edfe317e9b2513490c688d25b09484eb"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00007-z9m"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy/dockerImages/msai-manager%2Fmsai-manager@sha256:917471550174ff01e58ee89810873232cbdcd4db1dca980bd7d577dc238af03a"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00006-ksj"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy/dockerImages/msai-manager%2Fmsai-manager@sha256:f208fb81888929a1b676bd58d5c117a969374112825f9a3c3b27de2280644b6b"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00005-59x"
+    },
+    {
+        "project": "dummy",
+        "service": "cloud storage",
+        "raw_uri": "//storage.googleapis.com/dummy_client_bucket"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy/dockerImages/msai-manager%2Fmsai-manager@sha256:589325838734a169b7db839d76d5db9da11e79727bad25ab8887f1811e1d9ada"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00004-2j4"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy/dockerImages/msai-manager%2Fmsai-manager@sha256:062805f551d4eaac347085f557aa0d68fa588bc90ea1029299050658286e6ccb"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00003-n6l"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "pub/sub",
+        "raw_uri": "//pubsub.googleapis.com/projects/sprinternship-bld-2026/subscriptions/msa-parser"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00002-rkh"
+    },
+    {
+        "project": "1053168925742",
+        "service": "cloud build",
+        "raw_uri": "//cloudbuild.googleapis.com/projects/1053168925742/locations/global/triggers/2ad1a0f4-50f4-45f6-bb4e-db8614ef88ac"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "artifact registry",
+        "raw_uri": "//artifactregistry.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/repositories/cloud-run-source-deploy"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/revisions/msai-manager-00001-7p6"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud run",
+        "raw_uri": "//run.googleapis.com/projects/sprinternship-bld-2026/locations/europe-west1/services/msai-manager"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "pub/sub",
+        "raw_uri": "//pubsub.googleapis.com/projects/sprinternship-bld-2026/subscriptions/msa-update-sub"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "pub/sub",
+        "raw_uri": "//pubsub.googleapis.com/projects/sprinternship-bld-2026/topics/msa-update"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "identity and access management",
+        "raw_uri": "//iam.googleapis.com/projects/sprinternship-bld-2026/serviceAccounts/1053168925742-compute@developer.gserviceaccount.com"
+    },
+    {
+        "project": "msa",
+        "service": "cloud storage",
+        "raw_uri": "//storage.googleapis.com/msa_data_bucket"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud billing",
+        "raw_uri": "//cloudbilling.googleapis.com/projects/sprinternship-bld-2026/billingInfo"
+    },
+    {
+        "project": "sprinternship-bld-2026",
+        "service": "cloud resource manager",
+        "raw_uri": "//cloudresourcemanager.googleapis.com/projects/sprinternship-bld-2026"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/logging.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/sql-component.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/cloudtrace.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/containerregistry.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/cloudbuild.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/telemetry.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/cloudasset.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/storage-api.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/run.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "cloud build",
+        "raw_uri": "//cloudbuild.googleapis.com/projects/1053168925742/global_trigger_settings"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/dataform.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/serviceusage.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/datastore.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/staging-containeranalysis.sandbox.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/pubsub.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/storage-component.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/cloudapis.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/storage.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "cloud logging",
+        "raw_uri": "//logging.googleapis.com/projects/1053168925742/sinks/_Required"
+    },
+    {
+        "project": "1053168925742",
+        "service": "organization policy",
+        "raw_uri": "//orgpolicy.googleapis.com/projects/1053168925742/policies/iam.disableServiceAccountKeyCreation"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/monitoring.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/dataplex.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/bigqueryreservation.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/bigquerydatapolicy.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/bigquerymigration.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/bigquerystorage.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/bigquery.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/iam.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/iamcredentials.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/servicemanagement.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/bigqueryconnection.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/artifactregistry.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/aiplatform.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "service usage",
+        "raw_uri": "//serviceusage.googleapis.com/projects/1053168925742/services/analyticshub.googleapis.com"
+    },
+    {
+        "project": "1053168925742",
+        "service": "organization policy",
+        "raw_uri": "//orgpolicy.googleapis.com/projects/1053168925742/policies/gcp.restrictServiceUsage"
+    }
+]
