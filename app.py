@@ -6,7 +6,7 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from msa_chatbot import (
+from chatbot.john import (
     build_feed,
     load_customer_profiles,
     load_msa_profiles,

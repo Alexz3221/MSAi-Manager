@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import app
 import bigquery_data
-import msa_chatbot
+from chatbot import john, matching
 
 
 class BigQueryCustomerQueryTests(unittest.TestCase):
@@ -91,14 +91,21 @@ class LocalCustomerDataTests(unittest.TestCase):
             )
 
             with (
-                patch.object(msa_chatbot, "CUSTOMER_PROFILES_DIR", directory),
+                patch.object(matching, "CUSTOMER_PROFILES_DIR", directory),
                 patch.dict(os.environ, {"DATA_SOURCE": "local"}, clear=False),
             ):
-                profiles = msa_chatbot.load_customer_profiles()
+                profiles = matching.load_customer_profiles()
 
         self.assertEqual(set(profiles), {"legacy_customer", "asset_project"})
         self.assertEqual(set(profiles["asset_project"].services), {"bigquery", "cloud storage"})
         self.assertEqual(profiles["asset_project"].contacts, [])
+
+
+class JohnCompatibilityTests(unittest.TestCase):
+    def test_john_exposes_the_established_matching_api(self) -> None:
+        for name in matching.__all__:
+            with self.subTest(name=name):
+                self.assertIs(getattr(john, name), getattr(matching, name))
 
 if __name__ == "__main__":
     unittest.main()

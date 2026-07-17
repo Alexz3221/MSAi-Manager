@@ -9,7 +9,7 @@ from email.message import EmailMessage
 from html import escape
 from pathlib import Path
 
-from msa_chatbot import build_matches, load_customer_profiles
+from chatbot.john import build_matches, load_customer_profiles
 
 
 ROOT = Path(__file__).parent

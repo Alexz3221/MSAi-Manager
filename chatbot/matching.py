@@ -9,7 +9,46 @@ from pathlib import Path
 from typing import Any
 
 
-ROOT = Path(__file__).parent
+__all__ = [
+    "CustomerProfile",
+    "FeedImpact",
+    "FeedItem",
+    "MsaMatch",
+    "MsaProfile",
+    "action_items",
+    "build_feed",
+    "build_matches",
+    "customer_records",
+    "data_source",
+    "display_name",
+    "extract_prefixed_line",
+    "find_company",
+    "first_paragraph",
+    "flat_customer_profiles",
+    "interactive_chat",
+    "load_customer_profiles",
+    "load_msa_profiles",
+    "local_customer_records",
+    "main",
+    "matches_effective_date_filter",
+    "matches_service_filter",
+    "matching_customer_services",
+    "msa_records",
+    "normalize_name",
+    "normalize_term",
+    "parse_iso_date",
+    "print_company_answer",
+    "profile_summary",
+    "raw_summary",
+    "read_json",
+    "read_text",
+    "resolve_data_path",
+    "section_lines",
+    "service_terms",
+]
+
+
+ROOT = Path(__file__).resolve().parent.parent
 CUSTOMER_RAW_DIR = ROOT / "customer_data" / "raw"
 CUSTOMER_PROFILES_DIR = ROOT / "customer_data" / "customer_keywords_cleaned"
 MSA_PROFILES_DIR = ROOT / "msa_data" / "msa_keywords_cleaned"

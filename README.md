@@ -51,7 +51,9 @@ architecture; the current code does not yet connect those services.
 | File | Purpose |
 | --- | --- |
 | `app.py` | Web server, UI, and JSON endpoints |
-| `msa_chatbot.py` | Matching, filtering, and command-line lookup |
+| `chatbot/john.py` | John conversational agent and matching compatibility API |
+| `chatbot/matching.py` | Deterministic matching, filtering, and feed generation |
+| `chatbot/query.py` | Scoped relational join used by John's prototype ADK tool |
 | `bigquery_data.py` | BigQuery data reader |
 | `msa_keyword_extractor.py` | Converts raw MSA text into cleaned JSON |
 | `service_pull.py` | Experiments with Cloud Asset Inventory customer profiles |
@@ -80,6 +82,18 @@ python app.py
 ```
 
 Open <http://localhost:8080>.
+
+John's ADK prototype uses a local SQLite fixture for its scoped project/notice
+join. Build and verify that fixture before starting the interactive agent:
+
+```powershell
+python -m chatbot.seed
+python -m chatbot.query
+python -m chatbot.john
+```
+
+The first two commands do not require Google credentials. The interactive
+agent uses Vertex AI and therefore requires Application Default Credentials.
 
 ## Data-source settings
 
