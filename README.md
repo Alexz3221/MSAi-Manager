@@ -113,6 +113,39 @@ python -m services.john.john_agent.agent
 The first two commands do not require Google credentials. The interactive
 agent uses Vertex AI and therefore requires Application Default Credentials.
 
+## John on Cloud Run
+
+John deploys as a separate, authenticated Cloud Run service named `msai-john`.
+The service exposes the standard ADK API and keeps the dashboard deployment
+independent. Its service account needs the Vertex AI User role. From the
+repository root:
+
+```powershell
+gcloud auth login
+gcloud config set project sprinternship-bld-2026
+gcloud projects add-iam-policy-binding sprinternship-bld-2026 `
+  --member="serviceAccount:1053168925742-compute@developer.gserviceaccount.com" `
+  --role="roles/aiplatform.user"
+gcloud builds submit --config services/john/cloudbuild.yaml .
+```
+
+The build creates John's demo SQLite fixture inside the image, so the ignored
+local database is never uploaded. The service uses in-memory ADK sessions and
+is limited to one instance; sessions can still be lost when Cloud Run scales to
+zero or replaces the instance. Use a durable ADK session service before treating
+it as production chat history.
+
+After deployment, authenticate a local proxy and use the standard endpoints:
+
+```powershell
+gcloud run services proxy msai-john --region europe-west1 --port 8081
+Invoke-RestMethod http://localhost:8081/list-apps
+```
+
+Create a session with `/apps/john_agent/users/{user}/sessions/{session}` and
+send prompts to `/run`. Keep the service private until end-user authentication
+and project-level authorization are connected.
+
 ## Data-source settings
 
 Copy `.env.example` to `.env`, then choose `DATA_SOURCE=local` or
