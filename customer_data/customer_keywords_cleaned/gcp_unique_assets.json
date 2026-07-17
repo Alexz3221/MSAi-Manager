@@ -1,0 +1,66 @@
+[
+    {
+        "project": "449201385721",
+        "service": "Unknown Service (dns.googleapis.com)"
+    },
+    {
+        "project": "449201385721",
+        "service": "cloud logging"
+    },
+    {
+        "project": "449201385721",
+        "service": "cloud sql"
+    },
+    {
+        "project": "449201385721",
+        "service": "google kubernetes engine"
+    },
+    {
+        "project": "449201385721",
+        "service": "memorystore for redis"
+    },
+    {
+        "project": "449201385721",
+        "service": "organization policy"
+    },
+    {
+        "project": "acme-retail-web",
+        "service": "Unknown Service (cloudsql.googleapis.com)"
+    },
+    {
+        "project": "acme-retail-web",
+        "service": "Unknown Service (dns.googleapis.com)"
+    },
+    {
+        "project": "acme-retail-web",
+        "service": "artifact registry"
+    },
+    {
+        "project": "acme-retail-web",
+        "service": "cloud resource manager"
+    },
+    {
+        "project": "acme-retail-web",
+        "service": "compute engine"
+    },
+    {
+        "project": "acme-retail-web",
+        "service": "google kubernetes engine"
+    },
+    {
+        "project": "acme-retail-web",
+        "service": "identity and access management"
+    },
+    {
+        "project": "acme-retail-web",
+        "service": "memorystore for redis"
+    },
+    {
+        "project": "acme-static-web-assets",
+        "service": "cloud storage"
+    },
+    {
+        "project": "acme-user-receipts",
+        "service": "cloud storage"
+    }
+]
