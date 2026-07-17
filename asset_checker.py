@@ -1,5 +1,7 @@
 from google.cloud import asset_v1
 from google.api_core import client_options
+from google.cloud import resourcemanager_v3 # new api
+
 import re #regex
 import json
 from datetime import datetime
@@ -9,11 +11,22 @@ import os
 with open("customer_data/raw/asset_info1.txt", "r", encoding="utf-8") as f:
     raw_data = f.read()
 
+def get_project_id_automatically(project_number):
+    """
+    Queries Google Cloud's ResourceManager API to dynamically map the 
+    numeric project number to its human-readable Project ID.
+    """
+    try:
+        client = resourcemanager_v3.ProjectsClient()        
+        request = resourcemanager_v3.GetProjectRequest(name=f"projects/{project_number}")
+        project = client.get_project(request=request)
+        
+        return project.project_id
+    except Exception:
+        return project_number
 
 # Maps raw GCP Asset API service names to user-friendly keywords
 API_TO_KEYWORD_MAP: dict[str, str] = {
-    # Example ID -> Proj Name match
-    "1053168925742": "sprinternship-bld-2026",
     
     # Compute & Containers
     "compute.googleapis.com": "compute engine",
@@ -89,9 +102,6 @@ for line in raw_data.strip().split("\n"):
         
         # Decide project context
         project_name = project_group if project_group else fallback_group
-
-        if project_name in PROJECT_NUMBER_TO_ID_MAP:
-            project_name = PROJECT_NUMBER_TO_ID_MAP[project_name]
         
         # Resolve the service keyword. If the asset_type reveals a more specific API (like sqladmin),
         # check that first; otherwise, fall back to the raw service domain.
