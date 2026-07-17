@@ -12,6 +12,9 @@ with open("customer_data/raw/asset_info1.txt", "r", encoding="utf-8") as f:
 
 # Maps raw GCP Asset API service names to user-friendly keywords
 API_TO_KEYWORD_MAP: dict[str, str] = {
+    # Example ID -> Proj Name match
+    "1053168925742": "sprinternship-bld-2026",
+    
     # Compute & Containers
     "compute.googleapis.com": "compute engine",
     "container.googleapis.com": "google kubernetes engine",
@@ -86,6 +89,9 @@ for line in raw_data.strip().split("\n"):
         
         # Decide project context
         project_name = project_group if project_group else fallback_group
+
+        if project_name in PROJECT_NUMBER_TO_ID_MAP:
+            project_name = PROJECT_NUMBER_TO_ID_MAP[project_name]
         
         # Resolve the service keyword. If the asset_type reveals a more specific API (like sqladmin),
         # check that first; otherwise, fall back to the raw service domain.
