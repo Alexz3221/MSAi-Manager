@@ -53,7 +53,6 @@ architecture; the current code does not yet connect those services.
 | `app.py` | Web server, UI, and JSON endpoints |
 | `msa_chatbot.py` | Matching, filtering, and command-line lookup |
 | `bigquery_data.py` | BigQuery data reader |
-| `seed_bigquery.py` | Loads local cleaned JSON into existing BigQuery tables |
 | `msa_keyword_extractor.py` | Converts raw MSA text into cleaned JSON |
 | `service_pull.py` | Experiments with Cloud Asset Inventory customer profiles |
 | `combine_and_send.py` | Builds email previews and optionally uses SMTP |
@@ -101,19 +100,9 @@ Credentials. Cloud Run receives credentials from its assigned service account;
 local development requires separately configured credentials.
 
 The tracked `.env.example` lists the main settings. The web app reads variables
-from the process environment; it does not automatically load `.env`.
-
-## Seed the BigQuery prototype
-
-The dataset and tables must already exist. To replace their contents with the
-current local cleaned JSON:
-
-```powershell
-python seed_bigquery.py --replace
-```
-
-Omit `--replace` only when rows should be appended. Review local JSON changes
-before using replacement mode because it truncates both target tables.
+from the process environment; it does not automatically load `.env`. BigQuery
+tables are populated by external ingestion pipelines rather than this
+application.
 
 ## Useful endpoints
 

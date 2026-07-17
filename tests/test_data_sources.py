@@ -10,7 +10,6 @@ from unittest.mock import patch
 import app
 import bigquery_data
 import msa_chatbot
-import seed_bigquery
 
 
 class BigQueryCustomerQueryTests(unittest.TestCase):
@@ -100,68 +99,6 @@ class LocalCustomerDataTests(unittest.TestCase):
         self.assertEqual(set(profiles), {"legacy_customer", "asset_project"})
         self.assertEqual(set(profiles["asset_project"].services), {"bigquery", "cloud storage"})
         self.assertEqual(profiles["asset_project"].contacts, [])
-
-
-class BigQuerySeedNormalizationTests(unittest.TestCase):
-    def test_customer_documents_are_flattened_and_deduplicated(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            directory = Path(temp_dir)
-            (directory / "legacy.json").write_text(
-                json.dumps(
-                    {
-                        "company_id": "legacy",
-                        "raw_customer_path": "customer_data/raw/legacy.txt",
-                        "services": [
-                            {
-                                "name": "bigquery",
-                                "source": "customer_data/raw/legacy.txt",
-                            }
-                        ],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            (directory / "summary.json").write_text(
-                json.dumps([{"project": "demo", "service": "cloud storage"}]),
-                encoding="utf-8",
-            )
-            (directory / "assets.json").write_text(
-                json.dumps(
-                    [
-                        {
-                            "project": "demo",
-                            "service": "cloud storage",
-                            "raw_uri": "//storage.googleapis.com/buckets/demo",
-                        },
-                        {
-                            "project_name": "demo",
-                            "service": "cloud storage",
-                            "raw_uri": "//storage.googleapis.com/buckets/demo",
-                        },
-                    ]
-                ),
-                encoding="utf-8",
-            )
-
-            with patch.object(seed_bigquery, "CUSTOMER_PROFILES_DIR", directory):
-                rows = seed_bigquery.normalized_customer_records()
-
-        self.assertEqual(
-            rows,
-            [
-                {
-                    "project_name": "demo",
-                    "service": "cloud storage",
-                    "raw_uri": "//storage.googleapis.com/buckets/demo",
-                },
-                {
-                    "project_name": "legacy",
-                    "service": "bigquery",
-                    "raw_uri": "customer_data/raw/legacy.txt",
-                },
-            ],
-        )
-
 
 if __name__ == "__main__":
     unittest.main()
