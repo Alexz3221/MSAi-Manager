@@ -84,8 +84,54 @@ def display_name(value: str) -> str:
     return value.replace("_", " ").title()
 
 
-def read_json(path: Path) -> dict[str, Any]:
+def read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def flat_customer_profiles(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped_services: dict[str, set[str]] = {}
+
+    for row in rows:
+        project_name = str(
+            row.get("project_name") or row.get("project") or ""
+        ).strip()
+        service = str(row.get("service") or "").strip()
+        if not project_name or not service:
+            continue
+        grouped_services.setdefault(project_name, set()).add(service)
+
+    return [
+        {
+            "company_id": project_name,
+            "company_name": display_name(project_name),
+            "contacts": [],
+            "raw_customer_path": None,
+            "services": [
+                {"name": service, "aliases": []}
+                for service in sorted(services)
+            ],
+        }
+        for project_name, services in sorted(grouped_services.items())
+    ]
+
+
+def local_customer_records() -> list[dict[str, Any]]:
+    profiles: list[dict[str, Any]] = []
+    flat_rows: list[dict[str, Any]] = []
+
+    for path in sorted(CUSTOMER_PROFILES_DIR.glob("*.json")):
+        payload = read_json(path)
+        if isinstance(payload, list):
+            flat_rows.extend(row for row in payload if isinstance(row, dict))
+        elif isinstance(payload, dict):
+            if "company_id" in payload:
+                profiles.append(payload)
+            else:
+                flat_rows.append(payload)
+        else:
+            raise ValueError(f"Unsupported customer JSON root in {path}")
+
+    return [*profiles, *flat_customer_profiles(flat_rows)]
 
 
 def service_terms(service: dict[str, Any]) -> tuple[str, set[str]]:
@@ -118,7 +164,7 @@ def customer_records() -> list[dict[str, Any]]:
         from bigquery_data import load_customer_records
 
         return load_customer_records()
-    return [read_json(path) for path in sorted(CUSTOMER_PROFILES_DIR.glob("*.json"))]
+    return local_customer_records()
 
 
 def msa_records() -> list[dict[str, Any]]:

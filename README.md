@@ -20,6 +20,8 @@ a filterable web feed and can prepare notification email previews.
 - BigQuery project: `sprinternship-bld-2026`
 - Dataset: `msa_manager`
 - Tables: `customer_profiles` and `msa_updates`
+- `customer_profiles` stores flat `project_name`, `service`, and `raw_uri` rows;
+  the application groups them into project profiles when reading.
 - The tables may be empty during development, in which case the feed correctly
   returns zero results.
 - Raw text and generated output still use local files; Cloud Storage support has
