@@ -88,6 +88,16 @@ $env:DATA_SOURCE = "local"
 python app.py
 ```
 
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m pip install -e . --no-deps
+
+export DATA_SOURCE=local
+python app.py
+```
+
 Open <http://localhost:8080>.
 
 John's ADK prototype uses a local SQLite fixture for its scoped project/notice
