@@ -113,6 +113,26 @@ python -m services.john.john_agent.agent
 The first two commands do not require Google credentials. The interactive
 agent uses Vertex AI and therefore requires Application Default Credentials.
 
+## John in the web app
+
+The deployed `msai-manager` service presents two tools on one URL: the MSA feed
+and John. The browser sends John prompts to `POST /api/john`; the Python service
+runs the ADK agent and calls Gemini through Vertex AI. Gemini inference runs on
+Google-managed Vertex AI infrastructure, not inside the Cloud Run container.
+
+The Cloud Run service account needs the Vertex AI User role:
+
+```powershell
+gcloud projects add-iam-policy-binding sprinternship-bld-2026 `
+  --member="serviceAccount:1053168925742-compute@developer.gserviceaccount.com" `
+  --role="roles/aiplatform.user"
+```
+
+John currently uses the packaged demo SQLite fixture and in-memory conversation
+sessions. A session can be lost whenever Cloud Run replaces the instance, and
+the public endpoint needs end-user authentication and rate limiting before
+production use. The existing GitHub build trigger deploys both tools together.
+
 ## Data-source settings
 
 Copy `.env.example` to `.env`, then choose `DATA_SOURCE=local` or
@@ -165,6 +185,7 @@ under the root data or ignored `outputs/` directories.
 | `/api/companies` | Customer list |
 | `/api/services` | Service list |
 | `/api/feed` | Filterable MSA feed |
+| `/api/john` | John chat endpoint |
 
 Example filter:
 

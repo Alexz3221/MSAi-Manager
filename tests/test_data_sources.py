@@ -122,5 +122,9 @@ class PackageBoundaryTests(unittest.TestCase):
             "demo@example.com", lookback_days=90, product=None
         )
 
+    def test_john_exports_an_adk_root_agent_for_cloud_run(self) -> None:
+        self.assertEqual(john.root_agent.name, "msa_advisor")
+        self.assertEqual(john.root_agent.model, john.MODEL)
+
 if __name__ == "__main__":
     unittest.main()
