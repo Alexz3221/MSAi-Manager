@@ -102,6 +102,8 @@ for line in raw_data.strip().split("\n"):
         
         # Decide project context
         project_name = project_group if project_group else fallback_group
+
+        project_name = get_project_id_automatically(project_name)
         
         # Resolve the service keyword. If the asset_type reveals a more specific API (like sqladmin),
         # check that first; otherwise, fall back to the raw service domain.
