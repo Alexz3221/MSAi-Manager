@@ -79,6 +79,7 @@ msa_data/msa_keywords_cleaned/
 Python 3.12 is recommended.
 
 ```powershell
+/// Powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
@@ -89,6 +90,7 @@ python app.py
 ```
 
 ```bash
+/// Bash (Linux terminal)
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
