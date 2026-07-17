@@ -31,6 +31,15 @@ JOHN_RUNTIME = JohnRuntime()
 MAX_JOHN_MESSAGE_LENGTH = 4_000
 
 
+def bool_setting(name: str, default: bool) -> bool:
+    value = os.environ.get(name, str(default)).strip().casefold()
+    if value in {"1", "true", "yes", "y", "on"}:
+        return True
+    if value in {"0", "false", "no", "n", "off"}:
+        return False
+    raise RuntimeError(f"{name} must be true or false.")
+
+
 def positive_int_setting(name: str, default: int) -> int:
     try:
         value = int(os.environ.get(name, default))
@@ -41,6 +50,7 @@ def positive_int_setting(name: str, default: int) -> int:
     return value
 
 
+JOHN_ENABLED = bool_setting("JOHN_ENABLED", True)
 JOHN_RATE_LIMITER = JohnRateLimiter(
     per_client_limit=positive_int_setting("JOHN_RATE_LIMIT_PER_CLIENT", 25),
     per_client_window_seconds=positive_int_setting(
@@ -211,6 +221,11 @@ def html_page() -> str:
     .tool-tab.active {
       background: var(--accent);
       color: white;
+    }
+
+    .tool-tab:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
     }
 
     .tool-view[hidden] { display: none; }
@@ -542,7 +557,7 @@ def html_page() -> str:
       </div>
       <nav class="tool-nav" aria-label="Tools">
         <button class="tool-tab active" type="button" data-tool-target="feed-tool" aria-selected="true">Feed</button>
-        <button class="tool-tab" type="button" data-tool-target="john-tool" aria-selected="false">John</button>
+        <button class="tool-tab" id="john-tab" type="button" data-tool-target="john-tool" aria-selected="false">John</button>
       </nav>
     </header>
 
@@ -616,6 +631,7 @@ def html_page() -> str:
   </main>
 
   <script>
+    const johnEnabled = __JOHN_ENABLED__;
     const filters = document.querySelector("#filters");
     const companySelect = document.querySelector("#company");
     const serviceSelect = document.querySelector("#service");
@@ -628,9 +644,22 @@ def html_page() -> str:
     const johnMessage = document.querySelector("#john-message");
     const johnSend = document.querySelector("#john-send");
     const johnStatus = document.querySelector("#john-status");
+    const johnTab = document.querySelector("#john-tab");
     const chatLog = document.querySelector("#chat-log");
     const johnUserId = `web-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
     let johnSessionId = null;
+
+    if (!johnEnabled) {
+      johnTab.disabled = true;
+      johnTab.textContent = "John (offline)";
+      johnTab.setAttribute("aria-label", "John is currently disabled");
+      johnMessage.disabled = true;
+      johnSend.disabled = true;
+      johnStatus.textContent = "John is currently disabled by the administrator.";
+      document.querySelectorAll("[data-prompt]").forEach(button => {
+        button.disabled = true;
+      });
+    }
 
     function escapeHtml(value) {
       return String(value ?? "").replace(/[&<>"']/g, char => ({
@@ -823,7 +852,7 @@ def html_page() -> str:
     loadFilters().then(loadFeed);
   </script>
 </body>
-</html>"""
+</html>""".replace("__JOHN_ENABLED__", json.dumps(JOHN_ENABLED))
 
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -907,6 +936,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         parsed_url = urlparse(self.path)
 
         if parsed_url.path == "/api/john":
+            if not JOHN_ENABLED:
+                self.send_json(503, {"error": "John is currently disabled."})
+                return
+
             try:
                 content_length = int(self.headers.get("Content-Length", 0))
                 if content_length <= 0 or content_length > 16_384:

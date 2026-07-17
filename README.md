@@ -136,6 +136,21 @@ every five minutes and 300 total requests per hour by default. These values are
 configurable with the `JOHN_RATE_LIMIT_*` settings in `.env.example`. The
 existing GitHub build trigger deploys both tools together.
 
+Set `JOHN_ENABLED=false` to mark John offline and block his endpoint without
+taking down the feed.
+Changing a Cloud Run environment variable creates a new revision:
+
+```powershell
+gcloud run services update msai-manager `
+  --project sprinternship-bld-2026 `
+  --region europe-west1 `
+  --update-env-vars JOHN_ENABLED=false
+```
+
+Use the same command with `JOHN_ENABLED=true` to turn John back on. Disabled
+requests receive HTTP 503 before a Vertex AI request or rate-limit entry is
+created.
+
 ## Data-source settings
 
 Copy `.env.example` to `.env`, then choose `DATA_SOURCE=local` or

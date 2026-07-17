@@ -157,6 +157,37 @@ class RequestLoggingTests(unittest.TestCase):
         )
         chat.assert_not_called()
 
+    def test_john_endpoint_is_blocked_when_disabled(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/john",
+            data=b'{"message":"Hello"}',
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        with (
+            patch.object(app, "JOHN_ENABLED", False),
+            patch.object(app.JOHN_RATE_LIMITER, "check") as rate_limit,
+            patch.object(app.JOHN_RUNTIME, "chat") as chat,
+        ):
+            with self.assertRaises(HTTPError) as raised:
+                urlopen(request, timeout=5)
+
+        self.assertEqual(raised.exception.code, 503)
+        self.assertEqual(
+            json.loads(raised.exception.read()),
+            {"error": "John is currently disabled."},
+        )
+        rate_limit.assert_not_called()
+        chat.assert_not_called()
+
+    def test_home_marks_john_offline_when_disabled(self) -> None:
+        with patch.object(app, "JOHN_ENABLED", False):
+            page = app.html_page()
+
+        self.assertIn("const johnEnabled = false;", page)
+        self.assertIn('johnTab.textContent = "John (offline)";', page)
+
 
 if __name__ == "__main__":
     unittest.main()
