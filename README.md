@@ -84,8 +84,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 python -m pip install -e . --no-deps
-
-$env:DATA_SOURCE = "local"
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 python app.py
 ```
 
@@ -95,15 +94,16 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 python -m pip install -e . --no-deps
-
-export DATA_SOURCE=local
+cp -n .env.example .env
 python app.py
 ```
 
 Open <http://localhost:8080>.
 
-John's ADK prototype uses a local SQLite fixture for its scoped project/notice
-join. Build and verify that fixture before starting the interactive agent:
+The web app and John share the root `.env`; service-specific `.env` files are
+not needed. John's ADK prototype uses a local SQLite fixture for its scoped
+project/notice join. Build and verify that fixture before starting the
+interactive agent:
 
 ```powershell
 python -m scripts.seed_john_demo
@@ -116,7 +116,12 @@ agent uses Vertex AI and therefore requires Application Default Credentials.
 
 ## Data-source settings
 
-Local JSON is the default. For BigQuery:
+Copy `.env.example` to `.env`, then choose `DATA_SOURCE=local` or
+`DATA_SOURCE=bigquery`. The example defaults to local JSON. Its BigQuery values
+already point to the prototype dataset, so BigQuery mode only requires changing
+`DATA_SOURCE` and configuring credentials.
+
+Process environment variables can still override the file, for example:
 
 ```powershell
 $env:DATA_SOURCE = "bigquery"
@@ -132,10 +137,11 @@ table names are used. Google Cloud client libraries use Application Default
 Credentials. Cloud Run receives credentials from its assigned service account;
 local development requires separately configured credentials.
 
-The tracked `.env.example` lists the main settings. The web app reads variables
-from the process environment; it does not automatically load `.env`. BigQuery
-tables are populated by external ingestion pipelines rather than this
-application.
+The tracked `.env.example` lists non-secret settings for both services. The
+ignored root `.env` is loaded for local development without overriding values
+already supplied by the process. Cloud Run therefore continues to use its
+configured environment variables. BigQuery tables are populated by external
+ingestion pipelines rather than this application.
 
 ## Operational commands
 

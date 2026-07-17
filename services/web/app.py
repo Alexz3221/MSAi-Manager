@@ -5,13 +5,18 @@ import json
 import logging
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+from dotenv import load_dotenv
 
 from msai_core.matching import (
     build_feed,
     load_customer_profiles,
     load_msa_profiles,
 )
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 HOST = "0.0.0.0"
 PORT = int(os.environ.get("PORT", "8080"))
