@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -10,7 +11,6 @@ from msa_chatbot import (
     load_customer_profiles,
     load_msa_profiles,
 )
-
 
 HOST = "0.0.0.0"
 PORT = int(os.environ.get("PORT", "8080"))
@@ -526,6 +526,46 @@ class RequestHandler(BaseHTTPRequestHandler):
             return
 
         self.send_json(404, {"error": "Not found"})
+
+    def do_POST(self) -> None:
+        parsed_url = urlparse(self.path)
+
+        if parsed_url.path != "/":
+            self.send_json(404, {"error": "Not found"})
+            return
+
+        content_length = int(self.headers.get("Content-Length", 0))
+        raw_body = self.rfile.read(content_length)
+
+        try:
+            envelope = json.loads(raw_body)
+            message = envelope["message"]
+            decoded_bytes = base64.b64decode(message["data"])
+            file_info = json.loads(decoded_bytes)
+
+            bucket_name = file_info["bucket"]
+            blob_name = file_info["name"]
+
+            if not blob_name.endswith(".txt"):
+                self.send_response(204)
+                self.end_headers()
+                return
+
+            from msa_keyword_extractor import parse_msa_file, write_profile
+
+            profile = parse_msa_file(bucket_name, blob_name)
+            errors = write_profile(profile)
+
+            if errors:
+                self.send_json(500, {"error": str(errors)})
+                return
+
+            self.send_response(204)
+            self.end_headers()
+
+        except Exception as e:
+            self.send_json(500, {"error": str(e)})
+
 
     def log_message(self, format: str, *args: object) -> None:
         return
