@@ -60,10 +60,10 @@ def load_customer_records() -> list[dict[str, Any]]:
         f"""
         WITH distinct_services AS (
           SELECT DISTINCT
-            TRIM(project_name) AS project_name,
+            TRIM(project) AS project_name,
             TRIM(service) AS service
           FROM `{project}.{dataset}.{customer_table}`
-          WHERE NULLIF(TRIM(project_name), '') IS NOT NULL
+          WHERE NULLIF(TRIM(project), '') IS NOT NULL
             AND NULLIF(TRIM(service), '') IS NOT NULL
         )
         SELECT
