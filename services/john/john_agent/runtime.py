@@ -6,7 +6,7 @@ from collections.abc import Callable
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Any
 
-from .agent import PRINCIPAL, create_agent_app
+from .agent import create_agent_app
 
 
 class JohnRuntime:
@@ -75,7 +75,6 @@ class JohnRuntime:
                 session = await self._app.async_create_session(
                     user_id=user_id,
                     session_id=requested_session,
-                    state={"principal_email": PRINCIPAL},
                 )
                 session_id = self._session_id(session)
                 self._sessions.add((user_id, session_id))
