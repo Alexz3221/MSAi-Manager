@@ -72,6 +72,7 @@ class MsaProfile:
     subject: str | None
     headline: str | None
     date: str | None
+    distribution_date: str | None
     effective_date: str | None
     requires_customer_action: bool
 
@@ -81,6 +82,7 @@ class MsaMatch:
     msa_id: str
     subject: str
     date: str
+    distribution_date: str | None
     effective_date: str | None
     requires_customer_action: bool
     matching_services: list[str]
@@ -256,6 +258,7 @@ def load_msa_profiles() -> dict[str, MsaProfile]:
             subject=payload.get("subject"),
             headline=payload.get("headline"),
             date=payload.get("sent_date") or payload.get("date"),
+            distribution_date=payload.get("distribution_date"),
             effective_date=payload.get("effective_date"),
             requires_customer_action=bool(payload.get("requires_customer_action", False)),
         )
@@ -432,6 +435,7 @@ def build_matches(company_name: str) -> list[MsaMatch]:
                 or extract_prefixed_line(raw_text, "Subject:", "Unknown subject"),
                 date=msa_profile.date
                 or extract_prefixed_line(raw_text, "Date:", "Unknown date"),
+                distribution_date=msa_profile.distribution_date,
                 effective_date=msa_profile.effective_date,
                 requires_customer_action=msa_profile.requires_customer_action,
                 matching_services=matching_services,
