@@ -1,10 +1,11 @@
-"""Builds msa.db with hand-labeled fixtures. Delete the file and re-run to reset."""
+"""Build John's local demo database from hand-labeled fixtures."""
 import sqlite3, pathlib
 
-DB = pathlib.Path(__file__).parent / "msa.db"
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+DB = ROOT / "services" / "john" / "john_agent" / "msa.db"
 DB.unlink(missing_ok=True)
 con = sqlite3.connect(DB)
-con.executescript((pathlib.Path(__file__).parent / "schema.sql").read_text())
+con.executescript((ROOT / "sql" / "john_demo.sql").read_text())
 
 # --- notices: hand-labeled from the generated msa_*.txt set -------------------
 notices = [

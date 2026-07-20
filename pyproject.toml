@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "msai-manager"
+version = "0.1.0"
+description = "Match customer Google Cloud usage with relevant MSA updates."
+requires-python = ">=3.12"
+
+[tool.setuptools.packages.find]
+where = ["src"]

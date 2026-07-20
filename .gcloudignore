@@ -1,0 +1,7 @@
+.gcloudignore
+.git
+.gitignore
+#!include:.gitignore
+
+# User-owned local helper; never include it in remote build contexts.
+clear_outputs.py

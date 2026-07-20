@@ -1,14 +1,15 @@
 from google.cloud import asset_v1
 from google.api_core import client_options
 from google.cloud import resourcemanager_v3 
-
-import re #regex
+import re
 import json
 from datetime import datetime
-import os
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
 
 #Runs local client info 
-with open("customer_data/raw/asset_info5.txt", "r", encoding="utf-8") as f:
+with (ROOT / "customer_data" / "raw" / "asset_info5.txt").open(encoding="utf-8") as f:
     raw_data = f.read()
 
 def get_project_id_automatically(project_number):
@@ -123,16 +124,16 @@ for line in raw_data.strip().split("\n"):
 # Get the current date and time
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-output_folder = "customer_data/customer_keywords_cleaned"
+output_folder = ROOT / "customer_data" / "customer_keywords_cleaned"
 base_name = "assets"
 extension = ".json"
 
-os.makedirs(output_folder, exist_ok=True)
+output_folder.mkdir(parents=True, exist_ok=True)
 
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 file_name = f"{base_name}_{timestamp}{extension}"
 
-full_path = os.path.join(output_folder, file_name)
+full_path = output_folder / file_name
 
 # Export the list to a clean JSON file
 with open(full_path, "w") as json_file:

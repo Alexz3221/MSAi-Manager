@@ -16,7 +16,8 @@ from google.cloud import storage, bigquery
 _gcs = storage.Client()
 _bq = bigquery.Client()
 
-MSA_KEYWORDS_DIR = Path(__file__).parent / "msa_data" / "msa_keywords_cleaned"
+ROOT = Path(__file__).resolve().parents[1]
+MSA_KEYWORDS_DIR = ROOT / "msa_data" / "msa_keywords_cleaned"
 
 # canonical name -> surface forms seen in the wild
 #test commut

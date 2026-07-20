@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import os
+from pathlib import Path
 from typing import Any, Protocol
 
+from dotenv import load_dotenv
+from google.adk.agents import Agent
+
 from . import query
-from .matching import *
-from .matching import __all__ as _matching_exports
+
+
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "sprinternship-bld-2026")
@@ -44,24 +49,31 @@ Rules:
 """
 
 
+def create_root_agent() -> Agent:
+    """Create the ADK agent shared by the CLI and Cloud Run API server."""
+    return Agent(
+        model=MODEL,
+        name="msa_advisor",
+        description="Explains which MSA notices affect a customer's projects.",
+        instruction=SYSTEM,
+        tools=[find_msas_affecting_my_projects],
+    )
+
+
+root_agent = create_root_agent()
+
+
 def create_agent_app():
     """Build John's ADK app only when the conversational agent is requested."""
     os.environ.setdefault("GOOGLE_CLOUD_PROJECT", PROJECT_ID)
     os.environ.setdefault("GOOGLE_CLOUD_LOCATION", LOCATION)
     os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "TRUE")
 
-    from google.adk.agents import Agent
     import vertexai
     from vertexai import agent_engines
 
     vertexai.init(project=PROJECT_ID, location=LOCATION)
-    agent = Agent(
-        model=MODEL,
-        name="msa_advisor",
-        instruction=SYSTEM,
-        tools=[find_msas_affecting_my_projects],
-    )
-    return agent_engines.AdkApp(agent=agent)
+    return agent_engines.AdkApp(agent=root_agent)
 
 
 async def agent_main() -> None:
@@ -109,7 +121,6 @@ if __name__ == "__main__":
 
 
 __all__ = [
-    *_matching_exports,
     "LOCATION",
     "MODEL",
     "PRINCIPAL",
@@ -118,5 +129,7 @@ __all__ = [
     "USER_ID",
     "agent_main",
     "create_agent_app",
+    "create_root_agent",
     "find_msas_affecting_my_projects",
+    "root_agent",
 ]

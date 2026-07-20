@@ -7,9 +7,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import app
-import bigquery_data
-from chatbot import john, matching
+import msai_core
+from msai_core import bigquery, matching
+from services.john.john_agent import agent as john
+from services.web import app
 
 
 class BigQueryCustomerQueryTests(unittest.TestCase):
@@ -26,9 +27,9 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
                 },
                 clear=False,
             ),
-            patch.object(bigquery_data, "_query_records", return_value=sentinel) as query,
+            patch.object(bigquery, "_query_records", return_value=sentinel) as query,
         ):
-            self.assertEqual(bigquery_data.load_customer_records(), sentinel)
+            self.assertEqual(bigquery.load_customer_records(), sentinel)
 
         sql = query.call_args.args[0]
         self.assertIn("TRIM(project) AS project_name", sql)
@@ -52,8 +53,8 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
 
         with (
             patch.dict(os.environ, {"DATA_SOURCE": "bigquery"}, clear=False),
-            patch.object(bigquery_data, "load_customer_records", return_value=[]),
-            patch.object(bigquery_data, "load_msa_records", return_value=[msa_record]),
+            patch.object(bigquery, "load_customer_records", return_value=[]),
+            patch.object(bigquery, "load_msa_records", return_value=[msa_record]),
         ):
             self.assertEqual(app.companies_payload(), {"companies": []})
             self.assertEqual(app.services_payload(), {"services": ["bigquery"]})
@@ -102,11 +103,28 @@ class LocalCustomerDataTests(unittest.TestCase):
         self.assertEqual(profiles["asset_project"].contacts, [])
 
 
-class JohnCompatibilityTests(unittest.TestCase):
-    def test_john_exposes_the_established_matching_api(self) -> None:
-        for name in matching.__all__:
+class PackageBoundaryTests(unittest.TestCase):
+    def test_core_package_exposes_the_established_matching_api(self) -> None:
+        for name in msai_core.__all__:
             with self.subTest(name=name):
-                self.assertIs(getattr(john, name), getattr(matching, name))
+                self.assertIs(getattr(msai_core, name), getattr(matching, name))
+
+    def test_john_delegates_queries_to_its_tool_module(self) -> None:
+        class ToolContext:
+            state = {"principal_email": "demo@example.com"}
+
+        expected = {"notices": [], "count": 0}
+        with patch.object(john.query, "find_msas", return_value=expected) as find_msas:
+            result = john.find_msas_affecting_my_projects(ToolContext())
+
+        self.assertEqual(result, expected)
+        find_msas.assert_called_once_with(
+            "demo@example.com", lookback_days=90, product=None
+        )
+
+    def test_john_exports_an_adk_root_agent_for_cloud_run(self) -> None:
+        self.assertEqual(john.root_agent.name, "msa_advisor")
+        self.assertEqual(john.root_agent.model, john.MODEL)
 
 if __name__ == "__main__":
     unittest.main()

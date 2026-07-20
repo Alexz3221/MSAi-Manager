@@ -48,7 +48,7 @@ __all__ = [
 ]
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 CUSTOMER_RAW_DIR = ROOT / "customer_data" / "raw"
 CUSTOMER_PROFILES_DIR = ROOT / "customer_data" / "customer_keywords_cleaned"
 MSA_PROFILES_DIR = ROOT / "msa_data" / "msa_keywords_cleaned"
@@ -200,7 +200,7 @@ def resolve_data_path(value: Any, default_directory: Path, default_name: str) ->
 
 def customer_records() -> list[dict[str, Any]]:
     if data_source() == "bigquery":
-        from bigquery_data import load_customer_records
+        from .bigquery import load_customer_records
 
         return load_customer_records()
     return local_customer_records()
@@ -208,7 +208,7 @@ def customer_records() -> list[dict[str, Any]]:
 
 def msa_records() -> list[dict[str, Any]]:
     if data_source() == "bigquery":
-        from bigquery_data import load_msa_records
+        from .bigquery import load_msa_records
 
         return load_msa_records()
     return [read_json(path) for path in sorted(MSA_PROFILES_DIR.glob("*.json"))]
