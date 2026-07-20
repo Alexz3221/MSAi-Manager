@@ -1,8 +1,7 @@
 from google.cloud import asset_v1
 from google.api_core import client_options
-from google.cloud import resourcemanager_v3 # new api
-
-import re #regex
+from google.cloud import resourcemanager_v3 
+import re
 import json
 from datetime import datetime
 from pathlib import Path
@@ -10,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 #Runs local client info 
-with (ROOT / "customer_data" / "raw" / "asset_info1.txt").open(encoding="utf-8") as f:
+with (ROOT / "customer_data" / "raw" / "asset_info5.txt").open(encoding="utf-8") as f:
     raw_data = f.read()
 
 def get_project_id_automatically(project_number):
@@ -42,7 +41,7 @@ API_TO_KEYWORD_MAP: dict[str, str] = {
     "storage-api.googleapis.com": "cloud storage api",
     "storage-component.googleapis.com": "cloud storage component",
     "bigquery.googleapis.com": "bigquery",
-    "dataplex.googleapis.com": "dataplex (knowledge catalog)", # <-- Added Dataplex
+    "dataplex.googleapis.com": "dataplex (knowledge catalog)",
     "sqladmin.googleapis.com": "cloud sql",
     "sql-component.googleapis.com": "cloud sql component",
     "redis.googleapis.com": "memorystore for redis",
