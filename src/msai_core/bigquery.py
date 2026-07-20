@@ -91,6 +91,7 @@ def load_msa_records() -> list[dict[str, Any]]:
           raw_msa_path,
           format,
           sent_date,
+          distribution_date,
           category,
           subject,
           headline,

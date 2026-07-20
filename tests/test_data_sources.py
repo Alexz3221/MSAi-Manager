@@ -44,6 +44,7 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
             "msa_id": "msa_demo",
             "raw_msa_path": "msa_demo.txt",
             "sent_date": "2026-07-17",
+            "distribution_date": "2026-07-20",
             "subject": "BigQuery demo notice",
             "headline": "BigQuery demo notice",
             "effective_date": None,
@@ -59,6 +60,27 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
             self.assertEqual(app.companies_payload(), {"companies": []})
             self.assertEqual(app.services_payload(), {"services": ["bigquery"]})
             self.assertEqual(app.feed_payload({})["count"], 0)
+            self.assertEqual(
+                matching.load_msa_profiles()["msa_demo"].distribution_date,
+                "2026-07-20",
+            )
+
+    def test_msa_query_reads_distribution_date(self) -> None:
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "BQ_PROJECT_ID": "test-project",
+                    "BQ_DATASET": "test_dataset",
+                    "BQ_MSA_UPDATES_TABLE": "msa_updates",
+                },
+                clear=False,
+            ),
+            patch.object(bigquery, "_query_records", return_value=[]) as query,
+        ):
+            bigquery.load_msa_records()
+
+        self.assertIn("distribution_date", query.call_args.args[0])
 
 
 class LocalCustomerDataTests(unittest.TestCase):

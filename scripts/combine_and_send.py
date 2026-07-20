@@ -5,6 +5,7 @@ import os
 import re
 import smtplib
 from dataclasses import dataclass
+from datetime import date
 from email.message import EmailMessage
 from html import escape
 from pathlib import Path
@@ -25,6 +26,7 @@ class Notification:
     msa_id: str
     subject: str
     date: str
+    distribution_date: str | None
     effective_date: str | None
     requires_customer_action: bool
     summary: str
@@ -78,6 +80,7 @@ def build_notifications() -> list[Notification]:
                     msa_id=match.msa_id,
                     subject=match.subject,
                     date=match.date,
+                    distribution_date=match.distribution_date,
                     effective_date=match.effective_date,
                     requires_customer_action=match.requires_customer_action,
                     summary=match.summary,
@@ -104,6 +107,20 @@ def recipient_list(override_recipients: list[str] | None = None) -> list[str]:
     return override_recipients or DEFAULT_TEST_RECIPIENTS
 
 
+def parse_iso_date(value: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"Invalid ISO date {value!r}; expected YYYY-MM-DD.") from exc
+
+
+def notification_is_due(notification: Notification, as_of: date) -> bool:
+    """Return whether a notification should be delivered by the given date."""
+    if not notification.distribution_date:
+        return True
+    return parse_iso_date(notification.distribution_date) <= as_of
+
+
 def render_text_email(notification: Notification) -> str:
     services = ", ".join(notification.matching_services)
     actions = "\n".join(f"- {action}" for action in notification.actions)
@@ -118,6 +135,7 @@ MSA notice:
 {notification.subject}
 
 Notice date: {notification.date}
+Distribution date: {notification.distribution_date or "Not listed"}
 Effective date: {notification.effective_date or "Not listed"}
 Customer action required: {"Yes" if notification.requires_customer_action else "No"}
 Matched services: {services}
@@ -137,6 +155,9 @@ This is a generated preview from MSAi Manager.
 
 
 def render_html_email(notification: Notification) -> str:
+    distribution_date = escape(notification.distribution_date or "Not listed")
+    effective_date = escape(notification.effective_date or "Not listed")
+    action_required = "Yes" if notification.requires_customer_action else "No"
     services = "".join(
         f"<span class=\"pill\">{escape(service)}</span>"
         for service in notification.matching_services
@@ -213,8 +234,9 @@ def render_html_email(notification: Notification) -> str:
     <p>We found a Google Cloud MSA notice that appears relevant to services your company uses.</p>
 
     <div class="box">
-      <p><strong>Effective date:</strong> {escape(notification.effective_date or "Not listed")}</p>
-      <p><strong>Customer action required:</strong> {"Yes" if notification.requires_customer_action else "No"}</p>
+      <p><strong>Distribution date:</strong> {distribution_date}</p>
+      <p><strong>Effective date:</strong> {effective_date}</p>
+      <p><strong>Customer action required:</strong> {action_required}</p>
       <p><strong>Matched services:</strong></p>
       <div>{services}</div>
     </div>
@@ -304,9 +326,22 @@ def pretend_send_notification(
     print(f"  original_customer_contacts: {original_recipients}")
     print(f"  subject: {email_subject(notification)}")
     print(f"  company: {notification.account}")
+    print(f"  distribution_date: {notification.distribution_date or 'not listed'}")
     print(f"  matched_services: {services}")
     print(f"  text_preview: {preview.text_path}")
     print(f"  html_preview: {preview.html_path}")
+    print(f"  eml_preview: {preview.eml_path}")
+    print()
+
+
+def print_scheduled_notification(
+    notification: Notification,
+    preview: EmailPreview,
+) -> None:
+    print("SCHEDULED EMAIL - NOT DUE YET")
+    print(f"  company: {notification.account}")
+    print(f"  subject: {email_subject(notification)}")
+    print(f"  distribution_date: {notification.distribution_date}")
     print(f"  eml_preview: {preview.eml_path}")
     print()
 
@@ -340,6 +375,15 @@ def main() -> None:
         action="store_true",
         help="Actually send email through SMTP_HOST. Omit this to only write previews.",
     )
+    parser.add_argument(
+        "--as-of",
+        type=parse_iso_date,
+        default=date.today(),
+        help=(
+            "Date used to determine which notifications are due, in YYYY-MM-DD "
+            "format (default: today)."
+        ),
+    )
     args = parser.parse_args()
     recipients = args.recipient or DEFAULT_TEST_RECIPIENTS
 
@@ -349,13 +393,26 @@ def main() -> None:
         print("No customer service keywords matched cleaned MSA keywords.")
         return
 
-    for notification in notifications:
+    scheduled_notifications = [
+        (notification, notification_is_due(notification, args.as_of))
+        for notification in notifications
+    ]
+    due_count = 0
+    deferred_count = 0
+    for notification, is_due in scheduled_notifications:
         preview = write_email_preview(
             notification=notification,
             output_dir=Path(args.output_dir),
             sender=args.sender,
             recipients=recipients,
         )
+
+        if not is_due:
+            deferred_count += 1
+            print_scheduled_notification(notification, preview)
+            continue
+
+        due_count += 1
         pretend_send_notification(notification, preview, recipients=recipients)
 
         if args.send:
@@ -366,6 +423,11 @@ def main() -> None:
                     recipients=recipients,
                 )
             )
+
+    print(
+        f"Due now: {due_count}; deferred until a future distribution date: "
+        f"{deferred_count}."
+    )
 
 
 if __name__ == "__main__":

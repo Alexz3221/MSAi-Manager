@@ -239,6 +239,28 @@ and Storage Object User on the destination bucket. Object User allows later job
 runs to replace the same stable object names. The job exits after the two
 uploads, so it can later be executed manually or scheduled.
 
+### Email distribution dates
+
+`scripts.combine_and_send` reads the nullable `distribution_date` DATE column
+from `msa_updates`. A missing date, today's date, or a date in the past is due
+immediately. Future notifications still receive preview files but are not sent
+through SMTP until a run reaches their distribution date.
+
+By default the current local date is used. `--as-of` provides a deterministic
+date for validation:
+
+```powershell
+python -m scripts.combine_and_send --as-of 2026-07-20
+python -m scripts.combine_and_send --send --as-of 2026-07-20
+```
+
+SMTP does not hold a message until a future date; scheduling therefore requires
+running this command periodically, such as from a daily Cloud Run Job. The
+current prototype does not yet persist an already-sent delivery ledger. Do not
+schedule unattended daily `--send` executions until durable deduplication is
+added, because an overdue notification would otherwise be sent again on the
+next run.
+
 `scripts.asset_checker` and `scripts.msa_keyword_extractor` currently perform
 work when imported and should only be run intentionally. Local generated output
 stays under the root data or ignored `outputs/` directories; `service_pull` can
