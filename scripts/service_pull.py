@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 from dataclasses import dataclass
@@ -13,44 +12,23 @@ from google.cloud import asset_v1, storage
 
 ROOT = Path(__file__).resolve().parents[1]
 CUSTOMER_RAW_DIR = ROOT / "customer_data" / "raw"
-CUSTOMER_KEYWORDS_DIR = ROOT / "customer_data" / "customer_keywords_cleaned"
 DEFAULT_RAW_PREFIX = "raw_client_data"
-DEFAULT_PROCESSED_PREFIX = "processed_client_data"
 ACCOUNT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$")
 
 load_dotenv(ROOT / ".env")
 
 
-# Maps Cloud Asset Inventory asset-type services to feed service keywords.
-API_TO_KEYWORD_MAP: dict[str, str] = {
-    "storage.googleapis.com": "cloud storage",
-    "bigquery.googleapis.com": "bigquery",
-    "compute.googleapis.com": "compute engine",
-    "cloudfunctions.googleapis.com": "cloud functions",
-    "container.googleapis.com": "google kubernetes engine",
-    "pubsub.googleapis.com": "pub/sub",
-    "aiplatform.googleapis.com": "vertex ai",
-    "apigee.googleapis.com": "apigee",
-    "apigeeconnect.googleapis.com": "apigee mcp",
-    "sqladmin.googleapis.com": "cloud sql",
-    "logging.googleapis.com": "cloud logging",
-    "artifactregistry.googleapis.com": "artifact registry",
-    "run.googleapis.com": "cloud run",
-    "composer.googleapis.com": "cloud composer",
-    "redis.googleapis.com": "memorystore for redis",
-    "dialogflow.googleapis.com": "dialogflow es",
-    "bigtableadmin.googleapis.com": "cloud bigtable",
-    "iap.googleapis.com": "identity aware proxy",
-    "dataflow.googleapis.com": "dataflow",
-    "firestore.googleapis.com": "firestore",
-}
+@dataclass(frozen=True)
+class AssetRecord:
+    name: str
+    asset_type: str
 
 
 @dataclass(frozen=True)
-class ClientProfile:
+class AssetExport:
     account: str
     client_id: str
-    active_services: list[str]
+    assets: list[AssetRecord]
 
 
 def validate_account_name(account_name: str) -> str:
@@ -64,16 +42,6 @@ def validate_account_name(account_name: str) -> str:
             "numbers, dots, underscores, hyphens, or @."
         )
     return account_name
-
-
-def normalize_service_name(service: str) -> str:
-    """Match the casefold-on-read convention used by downstream consumers."""
-    return service.strip().casefold()
-
-
-def service_for_asset_type(asset_type: str) -> str:
-    service_api_name = asset_type.split("/", 1)[0]
-    return API_TO_KEYWORD_MAP.get(service_api_name, service_api_name)
 
 
 def project_id_from_resource(resource: str) -> str | None:
@@ -96,7 +64,7 @@ def project_ids_for_principal(
     }
 
 
-def services_for_project(client: Any, project_id: str) -> set[str]:
+def assets_for_project(client: Any, project_id: str) -> set[AssetRecord]:
     response = client.list_assets(
         request={
             "parent": f"projects/{project_id}",
@@ -104,19 +72,19 @@ def services_for_project(client: Any, project_id: str) -> set[str]:
         }
     )
     return {
-        service_for_asset_type(asset.asset_type)
+        AssetRecord(name=asset.name, asset_type=asset.asset_type)
         for asset in response
-        if asset.asset_type
+        if asset.name and asset.asset_type
     }
 
 
-def query_services(
+def query_assets(
     client_id: str,
     *,
     scope: str | None = None,
     client: Any | None = None,
-) -> list[str]:
-    """Return real active services from Cloud Asset Inventory.
+) -> list[AssetRecord]:
+    """Return unprocessed asset names and types from Cloud Asset Inventory.
 
     A project ID is queried directly. An email principal is first resolved to
     projects by searching IAM policies within GCP_SCOPE or GCP_ORGANIZATION.
@@ -150,10 +118,10 @@ def query_services(
         else:
             project_ids = {client_id}
 
-        active_services: set[str] = set()
+        assets: set[AssetRecord] = set()
         for project_id in sorted(project_ids):
-            active_services.update(services_for_project(asset_client, project_id))
-        return sorted(active_services)
+            assets.update(assets_for_project(asset_client, project_id))
+        return sorted(assets, key=lambda asset: (asset.name, asset.asset_type))
     except (ValueError, RuntimeError):
         raise
     except Exception as exc:
@@ -162,70 +130,36 @@ def query_services(
         ) from exc
 
 
-def build_profile(
+def build_export(
     account_name: str,
     client_id: str,
     *,
     scope: str | None = None,
     client: Any | None = None,
-) -> ClientProfile:
-    return ClientProfile(
+) -> AssetExport:
+    return AssetExport(
         account=validate_account_name(account_name),
         client_id=client_id,
-        active_services=query_services(client_id, scope=scope, client=client),
+        assets=query_assets(client_id, scope=scope, client=client),
     )
 
 
-def raw_profile_text(profile: ClientProfile) -> str:
-    lines = [
-        f"Account: {profile.account}",
-        f"Client ID: {profile.client_id}",
-        "Active services:",
-    ]
-    lines.extend(f"  - {service}" for service in profile.active_services)
-    return "\n".join(lines) + "\n"
+def raw_export_text(export: AssetExport) -> str:
+    """Serialize assets in the raw ``RESOURCE_NAME ASSET_TYPE`` format."""
+    if not export.assets:
+        return ""
+    return "\n".join(
+        f"{asset.name} {asset.asset_type}" for asset in export.assets
+    ) + "\n"
 
 
-def processed_profile_text(profile: ClientProfile, raw_reference: str) -> str:
-    payload = {
-        "company_id": profile.account,
-        "company_name": profile.account.replace("_", " ").title(),
-        "contacts": [],
-        "raw_customer_path": raw_reference,
-        "services": [
-            {
-                "name": normalize_service_name(service),
-                "aliases": [],
-                "confidence": 1.0,
-                "source": raw_reference,
-            }
-            for service in profile.active_services
-        ],
-    }
-    return json.dumps(payload, indent=2) + "\n"
-
-
-def write_raw_profile(
-    profile: ClientProfile,
+def write_raw_export(
+    export: AssetExport,
     directory: Path = CUSTOMER_RAW_DIR,
 ) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
-    output_path = directory / f"{profile.account}.txt"
-    output_path.write_text(raw_profile_text(profile), encoding="utf-8")
-    return output_path
-
-
-def write_keyword_json(
-    profile: ClientProfile,
-    directory: Path = CUSTOMER_KEYWORDS_DIR,
-) -> Path:
-    directory.mkdir(parents=True, exist_ok=True)
-    output_path = directory / f"{profile.account}.json"
-    raw_reference = f"customer_data/raw/{profile.account}.txt"
-    output_path.write_text(
-        processed_profile_text(profile, raw_reference),
-        encoding="utf-8",
-    )
+    output_path = directory / f"{export.account}.txt"
+    output_path.write_text(raw_export_text(export), encoding="utf-8")
     return output_path
 
 
@@ -241,44 +175,37 @@ def object_name(prefix: str, filename: str) -> str:
     return f"{clean_prefix}/{filename}" if clean_prefix else filename
 
 
-def upload_profile(
-    profile: ClientProfile,
+def upload_raw_export(
+    export: AssetExport,
     bucket_name: str,
     *,
     raw_prefix: str = DEFAULT_RAW_PREFIX,
-    processed_prefix: str = DEFAULT_PROCESSED_PREFIX,
     client: Any | None = None,
-) -> tuple[str, str]:
-    """Upload raw text and processed JSON and return their gs:// URIs."""
+) -> str:
+    """Upload the unprocessed asset export and return its gs:// URI."""
     normalized_bucket = normalize_bucket_name(bucket_name)
-    raw_object = object_name(raw_prefix, f"{profile.account}.txt")
-    processed_object = object_name(processed_prefix, f"{profile.account}.json")
+    raw_object = object_name(raw_prefix, f"{export.account}.txt")
     raw_uri = f"gs://{normalized_bucket}/{raw_object}"
-    processed_uri = f"gs://{normalized_bucket}/{processed_object}"
 
     try:
         storage_client = client or storage.Client()
         bucket = storage_client.bucket(normalized_bucket)
         bucket.blob(raw_object).upload_from_string(
-            raw_profile_text(profile),
+            raw_export_text(export),
             content_type="text/plain; charset=utf-8",
-        )
-        bucket.blob(processed_object).upload_from_string(
-            processed_profile_text(profile, raw_uri),
-            content_type="application/json; charset=utf-8",
         )
     except Exception as exc:
         raise RuntimeError(
-            f"Failed to upload profile to gs://{normalized_bucket}: {exc}"
+            f"Failed to upload raw assets to gs://{normalized_bucket}: {exc}"
         ) from exc
 
-    return raw_uri, processed_uri
+    return raw_uri
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Pull active GCP services from Cloud Asset Inventory and "
-        "write a raw and processed customer profile locally, to GCS, or both."
+        description="Pull raw asset names and types from Cloud Asset Inventory "
+        "and write them locally, to GCS, or both."
     )
     parser.add_argument(
         "--client-id",
@@ -309,14 +236,6 @@ def main() -> None:
         help=f"Raw object prefix (default: {DEFAULT_RAW_PREFIX}).",
     )
     parser.add_argument(
-        "--processed-prefix",
-        default=os.environ.get(
-            "CUSTOMER_PROCESSED_PREFIX",
-            DEFAULT_PROCESSED_PREFIX,
-        ),
-        help=f"Processed object prefix (default: {DEFAULT_PROCESSED_PREFIX}).",
-    )
-    parser.add_argument(
         "--no-local-output",
         action="store_true",
         help=(
@@ -332,23 +251,19 @@ def main() -> None:
         parser.error("--no-local-output requires --bucket or CUSTOMER_DATA_BUCKET.")
 
     account_name = args.account_name or args.client_id
-    profile = build_profile(account_name, args.client_id, scope=args.scope)
+    export = build_export(account_name, args.client_id, scope=args.scope)
 
     if not args.no_local_output:
-        raw_path = write_raw_profile(profile)
-        processed_path = write_keyword_json(profile)
+        raw_path = write_raw_export(export)
         print(f"Wrote {raw_path}")
-        print(f"Wrote {processed_path}")
 
     if args.bucket:
-        raw_uri, processed_uri = upload_profile(
-            profile,
+        raw_uri = upload_raw_export(
+            export,
             args.bucket,
             raw_prefix=args.raw_prefix,
-            processed_prefix=args.processed_prefix,
         )
         print(f"Uploaded {raw_uri}")
-        print(f"Uploaded {processed_uri}")
 
 
 if __name__ == "__main__":
