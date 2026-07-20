@@ -1,6 +1,6 @@
 from google.cloud import asset_v1
 from google.api_core import client_options
-from google.cloud import resourcemanager_v3 # new api
+from google.cloud import resourcemanager_v3 
 
 import re #regex
 import json
@@ -8,7 +8,7 @@ from datetime import datetime
 import os
 
 #Runs local client info 
-with open("customer_data/raw/asset_info1.txt", "r", encoding="utf-8") as f:
+with open("customer_data/raw/asset_info5.txt", "r", encoding="utf-8") as f:
     raw_data = f.read()
 
 def get_project_id_automatically(project_number):
@@ -40,7 +40,7 @@ API_TO_KEYWORD_MAP: dict[str, str] = {
     "storage-api.googleapis.com": "cloud storage api",
     "storage-component.googleapis.com": "cloud storage component",
     "bigquery.googleapis.com": "bigquery",
-    "dataplex.googleapis.com": "dataplex (knowledge catalog)", # <-- Added Dataplex
+    "dataplex.googleapis.com": "dataplex (knowledge catalog)",
     "sqladmin.googleapis.com": "cloud sql",
     "sql-component.googleapis.com": "cloud sql component",
     "redis.googleapis.com": "memorystore for redis",
@@ -123,7 +123,7 @@ for line in raw_data.strip().split("\n"):
 # Get the current date and time
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-output_folder = "customer_data/customer_keywords_cleaned"  # Change this to your folder path
+output_folder = "customer_data/customer_keywords_cleaned"
 base_name = "assets"
 extension = ".json"
 
