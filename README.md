@@ -33,8 +33,8 @@ a filterable web feed and can prepare notification email previews.
 | --- | --- | --- |
 | Cloud Run | Host the web UI and API | In use |
 | BigQuery | Store cleaned customer and MSA profiles | In use |
-| Cloud Asset Inventory | Discover services used by customer projects | Experimental script |
-| Cloud Storage | Supply raw MSA files to the ingestion path | In use |
+| Cloud Asset Inventory | Discover services used by customer projects | Export script ready for a job |
+| Cloud Storage | Supply raw MSA files and store customer-profile exports | In use |
 | Secret Manager | Store SMTP or external-service credentials | Possible |
 | Pub/Sub | Trigger MSA parsing when new Cloud Storage objects arrive | In use |
 | Cloud Scheduler | Run periodic imports and notification checks | Possible |
@@ -60,10 +60,10 @@ app.py                            compatibility entry point used by Cloud Run
 ```
 
 The web service and John both consume `msai_core`; neither service imports the
-other. Each deployable service has its own requirements file. The root
+other. Each deployable component has its own requirements file. The root
 `requirements.txt` installs the complete development toolset, while the root
-`Dockerfile` installs only `services/web/requirements.txt` for the existing
-Cloud Run deployment.
+`Dockerfile` installs the web, John, and script requirements so the same image
+can run either the service or a Cloud Run Job.
 
 Data is organized under:
 
@@ -190,9 +190,59 @@ python -m scripts.service_pull --help
 python -m scripts.combine_and_send --help
 ```
 
+### Cloud Asset customer export
+
+`scripts.service_pull` queries real Cloud Asset Inventory data and fails if
+credentials, permissions, scope, or uploads fail. It never substitutes mock
+services. With a bucket configured, it uploads these objects:
+
+```text
+gs://BUCKET/raw_client_data/ACCOUNT.txt
+gs://BUCKET/processed_client_data/ACCOUNT.json
+```
+
+Run a local export to the bucket shown in the Cloud Console:
+
+```powershell
+python -m scripts.service_pull `
+  --client-id sprinternship-bld-2026 `
+  --account-name example_customer `
+  --bucket dummy_client_bucket `
+  --no-local-output
+```
+
+Email-principal searches also require a scope such as
+`--scope projects/sprinternship-bld-2026`. Local runs use Application Default
+Credentials. The command loads non-secret defaults from the root `.env`.
+
+For a Cloud Run Job built from the same image as the web service, override the
+container command and arguments:
+
+```text
+Command: python
+Arguments: -m, scripts.service_pull, --no-local-output
+```
+
+Configure these job environment variables:
+
+```text
+CUSTOMER_CLIENT_ID=customer-project-id-or-email
+CUSTOMER_ACCOUNT_NAME=stable_output_name
+CUSTOMER_DATA_BUCKET=dummy_client_bucket
+CUSTOMER_RAW_PREFIX=raw_client_data
+CUSTOMER_PROCESSED_PREFIX=processed_client_data
+GCP_SCOPE=projects/sprinternship-bld-2026  # required only for email lookup
+```
+
+The job service account needs Cloud Asset Viewer on every queried scope/project
+and Storage Object User on the destination bucket. Object User allows later job
+runs to replace the same stable object names. The job exits after the two
+uploads, so it can later be executed manually or scheduled.
+
 `scripts.asset_checker` and `scripts.msa_keyword_extractor` currently perform
-work when imported and should only be run intentionally. Generated output stays
-under the root data or ignored `outputs/` directories.
+work when imported and should only be run intentionally. Local generated output
+stays under the root data or ignored `outputs/` directories; `service_pull` can
+also write directly to its configured bucket.
 
 ## Useful endpoints
 

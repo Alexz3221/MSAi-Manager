@@ -1,0 +1,227 @@
+from __future__ import annotations
+
+import json
+import os
+import tempfile
+import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from scripts import service_pull
+
+
+class FakeAssetClient:
+    def __init__(self, *, policies=(), project_assets=None) -> None:
+        self.policies = list(policies)
+        self.project_assets = project_assets or {}
+        self.search_requests: list[dict[str, object]] = []
+        self.list_requests: list[dict[str, object]] = []
+
+    def search_iam_policies(self, request):
+        self.search_requests.append(request)
+        return self.policies
+
+    def list_assets(self, request):
+        self.list_requests.append(request)
+        project_id = str(request["parent"]).split("/", 1)[1]
+        result = self.project_assets[project_id]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
+class FakeBlob:
+    def __init__(self, name: str, uploads: dict[str, tuple[str, str]]) -> None:
+        self.name = name
+        self.uploads = uploads
+
+    def upload_from_string(self, content: str, *, content_type: str) -> None:
+        self.uploads[self.name] = (content, content_type)
+
+
+class FakeBucket:
+    def __init__(self, uploads: dict[str, tuple[str, str]]) -> None:
+        self.uploads = uploads
+
+    def blob(self, name: str) -> FakeBlob:
+        return FakeBlob(name, self.uploads)
+
+
+class FakeStorageClient:
+    def __init__(self) -> None:
+        self.bucket_name: str | None = None
+        self.uploads: dict[str, tuple[str, str]] = {}
+
+    def bucket(self, name: str) -> FakeBucket:
+        self.bucket_name = name
+        return FakeBucket(self.uploads)
+
+
+class FailingStorageClient:
+    def bucket(self, name: str):
+        raise PermissionError(f"cannot write {name}")
+
+
+def asset(asset_type: str):
+    return SimpleNamespace(asset_type=asset_type)
+
+
+class ServicePullTests(unittest.TestCase):
+    def test_project_lookup_returns_sorted_mapped_services(self) -> None:
+        client = FakeAssetClient(
+            project_assets={
+                "customer-project": [
+                    asset("storage.googleapis.com/Bucket"),
+                    asset("bigquery.googleapis.com/Table"),
+                    asset("storage.googleapis.com/Bucket"),
+                ]
+            }
+        )
+
+        services = service_pull.query_services("customer-project", client=client)
+
+        self.assertEqual(services, ["bigquery", "cloud storage"])
+        self.assertEqual(
+            client.list_requests[0]["parent"],
+            "projects/customer-project",
+        )
+
+    def test_email_lookup_resolves_projects_with_explicit_scope(self) -> None:
+        client = FakeAssetClient(
+            policies=[
+                SimpleNamespace(
+                    resource="//cloudresourcemanager.googleapis.com/projects/project-a"
+                ),
+                SimpleNamespace(
+                    resource="//compute.googleapis.com/projects/project-b/zones/us/test"
+                ),
+            ],
+            project_assets={
+                "project-a": [asset("run.googleapis.com/Service")],
+                "project-b": [asset("pubsub.googleapis.com/Topic")],
+            },
+        )
+
+        services = service_pull.query_services(
+            "owner@example.com",
+            scope="organizations/1234",
+            client=client,
+        )
+
+        self.assertEqual(services, ["cloud run", "pub/sub"])
+        self.assertEqual(
+            client.search_requests,
+            [
+                {
+                    "scope": "organizations/1234",
+                    "query": "policy:owner@example.com",
+                }
+            ],
+        )
+
+    def test_email_lookup_requires_scope(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"GCP_SCOPE": "", "GCP_ORGANIZATION": ""},
+        ):
+            with self.assertRaisesRegex(ValueError, "GCP_SCOPE"):
+                service_pull.query_services(
+                    "owner@example.com",
+                    client=FakeAssetClient(),
+                )
+
+    def test_api_errors_fail_instead_of_returning_mock_services(self) -> None:
+        client = FakeAssetClient(
+            project_assets={"customer-project": PermissionError("denied")}
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Cloud Asset Inventory query failed",
+        ):
+            service_pull.query_services("customer-project", client=client)
+
+    def test_local_writers_create_existing_profile_format(self) -> None:
+        profile = service_pull.ClientProfile(
+            account="sample_customer",
+            client_id="customer-project",
+            active_services=["bigquery"],
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            raw_path = service_pull.write_raw_profile(profile, root / "raw")
+            processed_path = service_pull.write_keyword_json(
+                profile,
+                root / "processed",
+            )
+            raw_content = raw_path.read_text(encoding="utf-8")
+            payload = json.loads(processed_path.read_text(encoding="utf-8"))
+
+        self.assertIn("Client ID: customer-project", raw_content)
+        self.assertEqual(payload["contacts"], [])
+        self.assertEqual(
+            payload["raw_customer_path"],
+            "customer_data/raw/sample_customer.txt",
+        )
+        self.assertEqual(payload["services"][0]["name"], "bigquery")
+
+    def test_bucket_upload_uses_expected_folders_and_gcs_raw_reference(self) -> None:
+        profile = service_pull.ClientProfile(
+            account="sample_customer",
+            client_id="customer-project",
+            active_services=["cloud storage"],
+        )
+        client = FakeStorageClient()
+
+        raw_uri, processed_uri = service_pull.upload_profile(
+            profile,
+            "gs://dummy_client_bucket",
+            client=client,
+        )
+
+        self.assertEqual(client.bucket_name, "dummy_client_bucket")
+        self.assertEqual(
+            raw_uri,
+            "gs://dummy_client_bucket/raw_client_data/sample_customer.txt",
+        )
+        self.assertEqual(
+            processed_uri,
+            "gs://dummy_client_bucket/processed_client_data/sample_customer.json",
+        )
+        processed = json.loads(
+            client.uploads["processed_client_data/sample_customer.json"][0]
+        )
+        self.assertEqual(
+            client.uploads["raw_client_data/sample_customer.txt"][1],
+            "text/plain; charset=utf-8",
+        )
+        self.assertEqual(
+            client.uploads["processed_client_data/sample_customer.json"][1],
+            "application/json; charset=utf-8",
+        )
+        self.assertEqual(processed["raw_customer_path"], raw_uri)
+        self.assertEqual(processed["services"][0]["source"], raw_uri)
+
+    def test_bucket_upload_errors_fail_the_run(self) -> None:
+        profile = service_pull.ClientProfile(
+            account="sample_customer",
+            client_id="customer-project",
+            active_services=[],
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "Failed to upload profile"):
+            service_pull.upload_profile(
+                profile,
+                "dummy_client_bucket",
+                client=FailingStorageClient(),
+            )
+
+    def test_account_name_rejects_path_traversal(self) -> None:
+        with self.assertRaises(ValueError):
+            service_pull.validate_account_name("../customer")
+
+
+if __name__ == "__main__":
+    unittest.main()
