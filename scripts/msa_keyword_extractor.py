@@ -105,10 +105,23 @@ def to_iso(datestr):
             pass
     return None
 
+def find_distribution_date(text):
+    for pattern in DISTRIBUTION_DATE_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return to_iso(match.group(1))
+    return None
+
 
 DEADLINE_IN_SUBJECT = re.compile(
     r"\b(?:before|by|on|starting|changing)\s+"
     r"([A-Z][a-z]{2,8}\.?\s+\d{1,2},\s+\d{4})")
+
+DISTRIBUTION_DATE_PATTERNS = [
+    re.compile(r"scheduled for distribution on\s+([A-Z][a-z]+ \d{1,2},\s*\d{4})"),
+    re.compile(r"will receive a version of the following notification on\s+"
+                r"([A-Z][a-z]+ \d{1,2},\s*\d{4})"),
+]
 
 
 def parse_msa_file(bucket_name, blob_name):
@@ -139,6 +152,11 @@ def parse_msa_file(bucket_name, blob_name):
             scope = "tldr"
     if not services:
         scope = "none"
+
+    distribution_date = find_distribution_date(text)
+    if distribution_date is None:
+        print(f"WARN: no distribution date matched in {msa_id}: {subject_text[:60]!r}",
+              file=sys.stderr)
 
     # --- action / deadline: read the real fields, don't guess ---
     requires_action = get_field(text, "Does this message require customers to take action?")
@@ -177,6 +195,7 @@ def parse_msa_file(bucket_name, blob_name):
         "format": "account_team" if "Account Team MSA Notification" in text else "internal",
         "sent_date": to_iso(re.sub(r"^\w{3}, ", "", sent.group(1)).split(" at ")[0])
                      if sent else None,
+        "distribution_date": distribution_date,
         "category": category,
         "subject": subject,
         "headline": subject_text,
