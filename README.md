@@ -19,7 +19,8 @@ a filterable web feed and can prepare notification email previews.
 - The deployed service uses `DATA_SOURCE=bigquery`.
 - BigQuery project: `sprinternship-bld-2026`
 - Dataset: `msa_manager`
-- Tables: `customer_profiles` and `msa_updates`
+- Canonical tables: `msa_manager.customer_profiles` and
+  `msa_manager.msa_updates`; delivery queue: `msa_dataset.msa_daily_queue`
 - `customer_profiles` stores flat `project`, `service`, and `raw_uri` rows;
   the application groups them into project profiles when reading.
 - The tables may be empty during development, in which case the feed correctly
@@ -166,11 +167,15 @@ $env:BQ_PROJECT_ID = "sprinternship-bld-2026"
 $env:BQ_DATASET = "msa_manager"
 $env:BQ_CUSTOMERS_TABLE = "customer_profiles"
 $env:BQ_MSA_UPDATES_TABLE = "msa_updates"
+$env:BQ_QUEUE_DATASET = "msa_dataset"
+$env:BQ_DAILY_QUEUE_TABLE = "msa_daily_queue"
 python app.py
 ```
 
-`BQ_CUSTOMERS_TABLE` and `BQ_MSA_UPDATES_TABLE` are optional when the default
-table names are used. Google Cloud client libraries use Application Default
+The table-name settings are optional when the defaults are used. The queue has
+its own dataset setting because `msa_daily_queue` lives in `msa_dataset`, while
+the canonical MSA and customer tables live in `msa_manager`. Google Cloud
+client libraries use Application Default
 Credentials. Cloud Run receives credentials from its assigned service account;
 local development requires separately configured credentials.
 
@@ -239,12 +244,21 @@ and Storage Object User on the destination bucket. Object User allows later job
 runs to replace the same stable object names. The job exits after the two
 uploads, so it can later be executed manually or scheduled.
 
-### Email distribution dates
+### Daily MSA delivery queue
 
-`scripts.combine_and_send` reads the nullable `distribution_date` DATE column
-from `msa_updates`. A missing date, today's date, or a date in the past is due
-immediately. Future notifications still receive preview files but are not sent
-through SMTP until a run reaches their distribution date.
+In BigQuery mode, `scripts.combine_and_send` reads exactly one date partition
+from `msa_dataset.msa_daily_queue`. It selects only rows whose normalized
+`status` is `pending`, `queued`, or `failed`, deduplicates `(msa_id, client_id)`,
+and joins `msa_id` to `msa_manager.msa_updates` for the canonical notice
+content. The queue must be time-partitioned; the job fails instead of falling
+back to a full-table scan.
+
+`processed_at` is treated as the immutable queue-entry and partition timestamp.
+The consumer changes only `status`: it claims a row as `processing`, marks it
+`sent` after SMTP accepts the message, or marks it `failed` for another run.
+The nullable `distribution_date` from `msa_updates` still controls delivery: a
+missing date, today's date, or a past date is due immediately, while a future
+notification receives preview files but remains queued.
 
 By default the current local date is used. `--as-of` provides a deterministic
 date for validation:
@@ -252,14 +266,18 @@ date for validation:
 ```powershell
 python -m scripts.combine_and_send --as-of 2026-07-20
 python -m scripts.combine_and_send --send --as-of 2026-07-20
+python -m scripts.combine_and_send --send --consume-queue `
+  --recipient notifications@example.com --as-of 2026-07-20
 ```
 
 SMTP does not hold a message until a future date; scheduling therefore requires
-running this command periodically, such as from a daily Cloud Run Job. The
-current prototype does not yet persist an already-sent delivery ledger. Do not
-schedule unattended daily `--send` executions until durable deduplication is
-added, because an overdue notification would otherwise be sent again on the
-next run.
+running this command once per day, such as from an end-of-day Cloud Run Job.
+Queue consumption requires `--consume-queue`, `--send`, and at least one
+explicit `--recipient`. The explicit list is currently a job-wide destination;
+the BigQuery customer profile query does not yet expose per-client addresses.
+A process that exits after claiming but before recording success or failure can
+leave a row in `processing`, so operational recovery must reset that row to
+`failed` before rerunning the same date.
 
 `scripts.asset_checker` and `scripts.msa_keyword_extractor` currently perform
 work when imported and should only be run intentionally. Local generated output
