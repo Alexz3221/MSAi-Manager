@@ -248,17 +248,61 @@ class PackageBoundaryTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIs(getattr(msai_core, name), getattr(matching, name))
 
-    def test_john_delegates_queries_to_its_tool_module(self) -> None:
-        class ToolContext:
-            state = {"principal_email": "demo@example.com"}
+    def test_john_finds_customer_notices_through_matching_feed(self) -> None:
+        profile = matching.CustomerProfile(
+            company_id="demo_customer",
+            company_name="Demo Customer",
+            contacts=["demo@example.com"],
+            services={"bigquery": {"bigquery"}},
+            raw_customer_path="gs://customer-bucket/demo.txt",
+        )
+        feed_item = matching.FeedItem(
+            msa_id="msa-demo",
+            subject="BigQuery notice",
+            date="2026-07-20",
+            effective_date="2026-08-01",
+            requires_customer_action=True,
+            affected_services=["bigquery"],
+            impacted_companies=[
+                matching.FeedImpact(
+                    company_id="demo_customer",
+                    company_name="Demo Customer",
+                    contacts=["demo@example.com"],
+                    matching_services=["bigquery"],
+                )
+            ],
+            summary="Example summary",
+            actions=["Review the change."],
+            raw_msa_path="gs://msa-bucket/msa-demo.txt",
+        )
 
-        expected = {"notices": [], "count": 0}
-        with patch.object(john.query, "find_msas", return_value=expected) as find_msas:
-            result = john.find_msas_affecting_my_projects(ToolContext())
+        with (
+            patch.object(
+                john.matching,
+                "load_customer_profiles",
+                return_value={"demo_customer": profile},
+            ),
+            patch.object(
+                john.matching,
+                "build_feed",
+                return_value=[feed_item],
+            ) as build_feed,
+        ):
+            result = john.find_msas_for_customer(
+                object(),
+                "Demo Customer",
+                service="bigquery",
+                requires_action=True,
+            )
 
-        self.assertEqual(result, expected)
-        find_msas.assert_called_once_with(
-            "demo@example.com", lookback_days=90, product=None
+        self.assertTrue(result["found"])
+        self.assertEqual(result["company"], "Demo Customer")
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["notices"][0]["msa_id"], "msa-demo")
+        build_feed.assert_called_once_with(
+            company_query="Demo Customer",
+            service_query="bigquery",
+            requires_action=True,
         )
 
     def test_john_exports_an_adk_root_agent_for_cloud_run(self) -> None:
