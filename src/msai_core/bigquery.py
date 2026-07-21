@@ -142,7 +142,7 @@ def load_customer_records() -> list[dict[str, Any]]:
           CAST(NULL AS STRING) AS raw_customer_path,
           ARRAY(
             SELECT AS STRUCT
-              service AS name,
+              TRIM(service) AS name,
               ARRAY<STRING>[] AS aliases
             FROM UNNEST(active_services) AS service
             WHERE NULLIF(TRIM(service), '') IS NOT NULL
