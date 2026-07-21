@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import tempfile
 import unittest
@@ -63,25 +62,44 @@ class FailingStorageClient:
         raise PermissionError(f"cannot write {name}")
 
 
-def asset(asset_type: str):
-    return SimpleNamespace(asset_type=asset_type)
+def asset(name: str, asset_type: str):
+    return SimpleNamespace(name=name, asset_type=asset_type)
 
 
 class ServicePullTests(unittest.TestCase):
-    def test_project_lookup_returns_sorted_mapped_services(self) -> None:
+    def test_project_lookup_returns_sorted_raw_assets(self) -> None:
         client = FakeAssetClient(
             project_assets={
                 "customer-project": [
-                    asset("storage.googleapis.com/Bucket"),
-                    asset("bigquery.googleapis.com/Table"),
-                    asset("storage.googleapis.com/Bucket"),
+                    asset(
+                        "//storage.googleapis.com/customer-bucket",
+                        "storage.googleapis.com/Bucket",
+                    ),
+                    asset(
+                        "//bigquery.googleapis.com/projects/customer-project/"
+                        "datasets/data/tables/events",
+                        "bigquery.googleapis.com/Table",
+                    ),
                 ]
             }
         )
 
-        services = service_pull.query_services("customer-project", client=client)
+        assets = service_pull.query_assets("customer-project", client=client)
 
-        self.assertEqual(services, ["bigquery", "cloud storage"])
+        self.assertEqual(
+            assets,
+            [
+                service_pull.AssetRecord(
+                    name="//bigquery.googleapis.com/projects/customer-project/"
+                    "datasets/data/tables/events",
+                    asset_type="bigquery.googleapis.com/Table",
+                ),
+                service_pull.AssetRecord(
+                    name="//storage.googleapis.com/customer-bucket",
+                    asset_type="storage.googleapis.com/Bucket",
+                ),
+            ],
+        )
         self.assertEqual(
             client.list_requests[0]["parent"],
             "projects/customer-project",
@@ -98,18 +116,29 @@ class ServicePullTests(unittest.TestCase):
                 ),
             ],
             project_assets={
-                "project-a": [asset("run.googleapis.com/Service")],
-                "project-b": [asset("pubsub.googleapis.com/Topic")],
+                "project-a": [
+                    asset(
+                        "//run.googleapis.com/projects/project-a/locations/us/"
+                        "services/api",
+                        "run.googleapis.com/Service",
+                    )
+                ],
+                "project-b": [
+                    asset(
+                        "//pubsub.googleapis.com/projects/project-b/topics/events",
+                        "pubsub.googleapis.com/Topic",
+                    )
+                ],
             },
         )
 
-        services = service_pull.query_services(
+        assets = service_pull.query_assets(
             "owner@example.com",
             scope="organizations/1234",
             client=client,
         )
 
-        self.assertEqual(services, ["cloud run", "pub/sub"])
+        self.assertEqual(len(assets), 2)
         self.assertEqual(
             client.search_requests,
             [
@@ -126,7 +155,7 @@ class ServicePullTests(unittest.TestCase):
             {"GCP_SCOPE": "", "GCP_ORGANIZATION": ""},
         ):
             with self.assertRaisesRegex(ValueError, "GCP_SCOPE"):
-                service_pull.query_services(
+                service_pull.query_assets(
                     "owner@example.com",
                     client=FakeAssetClient(),
                 )
@@ -140,43 +169,47 @@ class ServicePullTests(unittest.TestCase):
             RuntimeError,
             "Cloud Asset Inventory query failed",
         ):
-            service_pull.query_services("customer-project", client=client)
+            service_pull.query_assets("customer-project", client=client)
 
-    def test_local_writers_create_existing_profile_format(self) -> None:
-        profile = service_pull.ClientProfile(
+    def test_local_writer_preserves_raw_asset_format(self) -> None:
+        export = service_pull.AssetExport(
             account="sample_customer",
             client_id="customer-project",
-            active_services=["bigquery"],
+            assets=[
+                service_pull.AssetRecord(
+                    name="//bigquery.googleapis.com/projects/customer-project/"
+                    "datasets/data/tables/events",
+                    asset_type="bigquery.googleapis.com/Table",
+                )
+            ],
         )
 
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
-            raw_path = service_pull.write_raw_profile(profile, root / "raw")
-            processed_path = service_pull.write_keyword_json(
-                profile,
-                root / "processed",
-            )
+            raw_path = service_pull.write_raw_export(export, root / "raw")
             raw_content = raw_path.read_text(encoding="utf-8")
-            payload = json.loads(processed_path.read_text(encoding="utf-8"))
 
-        self.assertIn("Client ID: customer-project", raw_content)
-        self.assertEqual(payload["contacts"], [])
         self.assertEqual(
-            payload["raw_customer_path"],
-            "customer_data/raw/sample_customer.txt",
+            raw_content,
+            "//bigquery.googleapis.com/projects/customer-project/"
+            "datasets/data/tables/events bigquery.googleapis.com/Table\n",
         )
-        self.assertEqual(payload["services"][0]["name"], "bigquery")
 
-    def test_bucket_upload_uses_expected_folders_and_gcs_raw_reference(self) -> None:
-        profile = service_pull.ClientProfile(
+    def test_bucket_upload_only_writes_raw_asset_text(self) -> None:
+        export = service_pull.AssetExport(
             account="sample_customer",
             client_id="customer-project",
-            active_services=["cloud storage"],
+            assets=[
+                service_pull.AssetRecord(
+                    name="//storage.googleapis.com/customer-bucket",
+                    asset_type="storage.googleapis.com/Bucket",
+                )
+            ],
         )
         client = FakeStorageClient()
 
-        raw_uri, processed_uri = service_pull.upload_profile(
-            profile,
+        raw_uri = service_pull.upload_raw_export(
+            export,
             "gs://dummy_client_bucket",
             client=client,
         )
@@ -186,34 +219,27 @@ class ServicePullTests(unittest.TestCase):
             raw_uri,
             "gs://dummy_client_bucket/raw_client_data/sample_customer.txt",
         )
-        self.assertEqual(
-            processed_uri,
-            "gs://dummy_client_bucket/processed_client_data/sample_customer.json",
-        )
-        processed = json.loads(
-            client.uploads["processed_client_data/sample_customer.json"][0]
-        )
+        self.assertEqual(list(client.uploads), ["raw_client_data/sample_customer.txt"])
         self.assertEqual(
             client.uploads["raw_client_data/sample_customer.txt"][1],
             "text/plain; charset=utf-8",
         )
         self.assertEqual(
-            client.uploads["processed_client_data/sample_customer.json"][1],
-            "application/json; charset=utf-8",
+            client.uploads["raw_client_data/sample_customer.txt"][0],
+            "//storage.googleapis.com/customer-bucket "
+            "storage.googleapis.com/Bucket\n",
         )
-        self.assertEqual(processed["raw_customer_path"], raw_uri)
-        self.assertEqual(processed["services"][0]["source"], raw_uri)
 
     def test_bucket_upload_errors_fail_the_run(self) -> None:
-        profile = service_pull.ClientProfile(
+        export = service_pull.AssetExport(
             account="sample_customer",
             client_id="customer-project",
-            active_services=[],
+            assets=[],
         )
 
-        with self.assertRaisesRegex(RuntimeError, "Failed to upload profile"):
-            service_pull.upload_profile(
-                profile,
+        with self.assertRaisesRegex(RuntimeError, "Failed to upload raw assets"):
+            service_pull.upload_raw_export(
+                export,
                 "dummy_client_bucket",
                 client=FailingStorageClient(),
             )

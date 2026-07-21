@@ -106,9 +106,7 @@ project/notice join. Build and verify that fixture before starting the
 interactive agent:
 
 ```powershell
-python -m scripts.seed_john_demo
-python -m services.john.john_agent.query
-python -m services.john.john_agent.agent
+DATA_SOURCE=bigquery python3 -m services.john.john_agent.agent
 ```
 
 The first two commands do not require Google credentials. The interactive
@@ -199,11 +197,18 @@ python -m scripts.combine_and_send --help
 
 `scripts.service_pull` queries real Cloud Asset Inventory data and fails if
 credentials, permissions, scope, or uploads fail. It never substitutes mock
-services. With a bucket configured, it uploads these objects:
+data or converts the result into a customer-profile JSON document. With a
+bucket configured, it uploads one raw text object:
 
 ```text
 gs://BUCKET/raw_client_data/ACCOUNT.txt
-gs://BUCKET/processed_client_data/ACCOUNT.json
+```
+
+Each line preserves the Cloud Asset Inventory resource name and asset type in
+the same raw format consumed by `scripts.asset_checker`:
+
+```text
+//storage.googleapis.com/example-bucket storage.googleapis.com/Bucket
 ```
 
 Run a local export to the bucket shown in the Cloud Console:
@@ -235,14 +240,13 @@ CUSTOMER_CLIENT_ID=customer-project-id-or-email
 CUSTOMER_ACCOUNT_NAME=stable_output_name
 CUSTOMER_DATA_BUCKET=dummy_client_bucket
 CUSTOMER_RAW_PREFIX=raw_client_data
-CUSTOMER_PROCESSED_PREFIX=processed_client_data
 GCP_SCOPE=projects/sprinternship-bld-2026  # required only for email lookup
 ```
 
 The job service account needs Cloud Asset Viewer on every queried scope/project
 and Storage Object User on the destination bucket. Object User allows later job
-runs to replace the same stable object names. The job exits after the two
-uploads, so it can later be executed manually or scheduled.
+runs to replace the same stable object name. The job exits after the upload, so
+it can later be executed manually or scheduled.
 
 ### Daily MSA delivery queue
 
