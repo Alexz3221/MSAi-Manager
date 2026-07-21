@@ -197,7 +197,7 @@ The format is consumed directly by `scripts.asset_checker`:
 ```text
 Account: example_customer
 Client ID: customer-project-id
-Active Services:
+Active services:
 - bigquery
 - cloud storage
 ```

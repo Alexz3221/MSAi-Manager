@@ -14,6 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RAW_PREFIX = "raw_client_data"
 ACCOUNT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$")
 ASSET_SERVICE_PATTERN = re.compile(r"^//([a-z0-9.-]+\.googleapis\.com)(?:/|$)")
+ASSET_TYPE_SERVICE_PATTERN = re.compile(
+    r"^([a-z0-9.-]+\.googleapis\.com)(?:/|$)"
+)
 
 API_TO_KEYWORD_MAP: dict[str, str] = {
     "compute.googleapis.com": "compute engine",
@@ -25,6 +28,7 @@ API_TO_KEYWORD_MAP: dict[str, str] = {
     "storage-api.googleapis.com": "cloud storage api",
     "storage-component.googleapis.com": "cloud storage component",
     "bigquery.googleapis.com": "bigquery",
+    "bigquerydatatransfer.googleapis.com": "bigquery data transfer",
     "dataplex.googleapis.com": "dataplex (knowledge catalog)",
     "sqladmin.googleapis.com": "cloud sql",
     "sql-component.googleapis.com": "cloud sql component",
@@ -37,6 +41,7 @@ API_TO_KEYWORD_MAP: dict[str, str] = {
     "dataflow.googleapis.com": "dataflow",
     "composer.googleapis.com": "cloud composer",
     "cloudbuild.googleapis.com": "cloud build",
+    "cloudscheduler.googleapis.com": "cloud scheduler",
     "artifactregistry.googleapis.com": "artifact registry",
     "containerregistry.googleapis.com": "container registry",
     "dataform.googleapis.com": "dataform",
@@ -51,6 +56,7 @@ API_TO_KEYWORD_MAP: dict[str, str] = {
     "iam.googleapis.com": "identity and access management",
     "iap.googleapis.com": "identity aware proxy",
     "cloudasset.googleapis.com": "cloud asset inventory",
+    "secretmanager.googleapis.com": "secret manager",
     "logging.googleapis.com": "cloud logging",
     "monitoring.googleapis.com": "cloud monitoring",
     "cloudtrace.googleapis.com": "cloud trace",
@@ -98,15 +104,24 @@ def project_id_from_resource(resource: str) -> str | None:
 
 
 def keyword_for_asset(asset_name: str, asset_type: str) -> str:
-    """Return the friendly service keyword for a Cloud Asset record."""
-    normalized_asset_type = asset_type.casefold()
-    for api_name, keyword in API_TO_KEYWORD_MAP.items():
-        if api_name in normalized_asset_type:
-            return keyword
+    """Return a compact keyword without exposing a raw Google API domain."""
+    type_match = ASSET_TYPE_SERVICE_PATTERN.match(asset_type.casefold())
+    name_match = ASSET_SERVICE_PATTERN.match(asset_name.casefold())
+    api_name = (
+        type_match.group(1)
+        if type_match
+        else name_match.group(1) if name_match else None
+    )
+    if not api_name:
+        return "Unknown Service"
 
-    match = ASSET_SERVICE_PATTERN.match(asset_name.casefold())
-    raw_service = match.group(1) if match else None
-    return API_TO_KEYWORD_MAP.get(raw_service or "", "Unknown Service")
+    mapped_keyword = API_TO_KEYWORD_MAP.get(api_name)
+    if mapped_keyword:
+        return mapped_keyword
+
+    # Keep newly introduced APIs useful until an explicit human-friendly
+    # mapping is added. The export never leaks the `.googleapis.com` suffix.
+    return api_name.removesuffix(".googleapis.com").replace("-", " ")
 
 
 def project_ids_for_principal(
@@ -216,7 +231,7 @@ def raw_export_text(export: AssetExport) -> str:
     lines = [
         f"Account: {export.account}",
         f"Client ID: {export.client_id}",
-        "Active Services:",
+        "Active services:",
         *(f"- {keyword}" for keyword in keywords),
     ]
     return "\n".join(lines) + "\n"

@@ -186,8 +186,50 @@ class ServicePullTests(unittest.TestCase):
             service_pull.raw_export_text(export),
             "Account: sample_customer\n"
             "Client ID: customer-project\n"
-            "Active Services:\n"
+            "Active services:\n"
             "- bigquery\n",
+        )
+
+    def test_common_api_domains_are_mapped_and_deduplicated(self) -> None:
+        export = service_pull.AssetExport(
+            account="sprinternship_bld_2026",
+            client_id="sprinternship-bld-2026",
+            assets=[
+                service_pull.AssetRecord(
+                    name=f"//{api_name}/projects/demo/resources/item",
+                    asset_type=f"{api_name}/Resource",
+                )
+                for api_name in (
+                    "bigquerydatatransfer.googleapis.com",
+                    "cloudbuild.googleapis.com",
+                    "cloudscheduler.googleapis.com",
+                    "secretmanager.googleapis.com",
+                    "cloudbuild.googleapis.com",
+                )
+            ],
+        )
+
+        output = service_pull.raw_export_text(export)
+
+        self.assertEqual(
+            output,
+            "Account: sprinternship_bld_2026\n"
+            "Client ID: sprinternship-bld-2026\n"
+            "Active services:\n"
+            "- bigquery data transfer\n"
+            "- cloud build\n"
+            "- cloud scheduler\n"
+            "- secret manager\n",
+        )
+        self.assertNotIn("googleapis.com", output)
+
+    def test_unmapped_api_uses_a_clean_domain_fallback(self) -> None:
+        self.assertEqual(
+            service_pull.keyword_for_asset(
+                "//network-security.googleapis.com/projects/demo/resources/item",
+                "network-security.googleapis.com/Resource",
+            ),
+            "network security",
         )
 
     def test_export_is_accepted_by_cloud_asset_checker(self) -> None:
@@ -252,7 +294,7 @@ class ServicePullTests(unittest.TestCase):
             client.uploads["raw_client_data/sample_customer.txt"][0],
             "Account: sample_customer\n"
             "Client ID: customer-project\n"
-            "Active Services:\n"
+            "Active services:\n"
             "- cloud storage\n",
         )
 
