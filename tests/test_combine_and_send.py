@@ -30,8 +30,8 @@ def notification(
         requires_customer_action=True,
         summary="Example summary",
         actions=["Review the change."],
-        customer_raw_path=Path("customer.txt"),
-        raw_msa_path=Path("msa.txt"),
+        customer_raw_path="gs://customer-bucket/customer.txt",
+        raw_msa_path="gs://msa-bucket/msa.txt",
         matching_services=["bigquery"],
         queue_client_id=queue_client_id,
     )
@@ -66,48 +66,27 @@ class CombineAndSendSchedulingTests(unittest.TestCase):
             company_id="example_customer",
             company_name="Example Customer",
             contacts=[],
-            raw_customer_path=Path("customer.txt"),
-        )
-        match = SimpleNamespace(
-            msa_id="msa-demo",
-            subject="Example MSA",
-            date="2026-07-01",
-            distribution_date="2026-07-25",
-            effective_date=None,
-            requires_customer_action=False,
-            summary="Summary",
-            actions=[],
-            raw_msa_path=Path("msa.txt"),
-            matching_services=["bigquery"],
+            raw_customer_path="",
+            services={"bigquery": {"bigquery"}},
         )
 
-        with (
-            patch.object(
-                combine_and_send.matching,
-                "data_source",
-                return_value="local",
-            ),
-            patch.object(
-                combine_and_send,
-                "load_customer_profiles",
-                return_value={"example_customer": profile},
-            ),
-            patch.object(
-                combine_and_send,
-                "build_matches",
-                return_value=[match],
-            ),
-        ):
-            notifications = combine_and_send.build_notifications()
+        with patch.object(combine_and_send.matching, "read_text", return_value=""):
+            result = combine_and_send.notification_from_queue_record(
+                queue_record(
+                    client_id="example_customer",
+                    distribution_date="2026-07-25",
+                ),
+                {"example_customer": profile},
+            )
 
-        self.assertEqual(notifications[0].distribution_date, "2026-07-25")
+        self.assertEqual(result.distribution_date, "2026-07-25")
 
     def test_bigquery_mode_builds_only_pending_queue_notifications(self) -> None:
         profile = SimpleNamespace(
             company_id="example_project",
             company_name="Example Project",
             contacts=[],
-            raw_customer_path=Path("customer.txt"),
+            raw_customer_path="",
             services={"bigquery": {"bigquery"}},
         )
         as_of = date(2026, 7, 20)
@@ -161,7 +140,7 @@ class CombineAndSendSchedulingTests(unittest.TestCase):
             company_id="example_project",
             company_name="Example Project",
             contacts=[],
-            raw_customer_path=Path("customer.txt"),
+            raw_customer_path="",
             services={"bigquery": {"bigquery"}},
         )
         errors: list[str] = []

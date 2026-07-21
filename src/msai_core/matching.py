@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
+from functools import lru_cache
 from typing import Any
 
 
@@ -24,11 +23,9 @@ __all__ = [
     "extract_prefixed_line",
     "find_company",
     "first_paragraph",
-    "flat_customer_profiles",
     "interactive_chat",
     "load_customer_profiles",
     "load_msa_profiles",
-    "local_customer_records",
     "main",
     "matches_effective_date_filter",
     "matches_service_filter",
@@ -40,19 +37,11 @@ __all__ = [
     "print_company_answer",
     "profile_summary",
     "raw_summary",
-    "read_json",
     "read_text",
     "resolve_data_path",
     "section_lines",
     "service_terms",
 ]
-
-
-ROOT = Path(__file__).resolve().parents[2]
-CUSTOMER_RAW_DIR = ROOT / "customer_data" / "raw"
-CUSTOMER_PROFILES_DIR = ROOT / "customer_data" / "customer_keywords_cleaned"
-MSA_PROFILES_DIR = ROOT / "msa_data" / "msa_keywords_cleaned"
-RAW_MSA_DIR = ROOT / "msa_data" / "raw"
 
 
 @dataclass(frozen=True)
@@ -61,14 +50,14 @@ class CustomerProfile:
     company_name: str
     contacts: list[str]
     services: dict[str, set[str]]
-    raw_customer_path: Path
+    raw_customer_path: str
 
 
 @dataclass(frozen=True)
 class MsaProfile:
     msa_id: str
     affected_services: dict[str, set[str]]
-    raw_msa_path: Path
+    raw_msa_path: str
     subject: str | None
     headline: str | None
     date: str | None
@@ -88,7 +77,7 @@ class MsaMatch:
     matching_services: list[str]
     summary: str
     actions: list[str]
-    raw_msa_path: Path
+    raw_msa_path: str
 
 
 @dataclass(frozen=True)
@@ -110,7 +99,7 @@ class FeedItem:
     impacted_companies: list[FeedImpact]
     summary: str
     actions: list[str]
-    raw_msa_path: Path
+    raw_msa_path: str
 
 
 def normalize_name(value: str) -> str:
@@ -125,56 +114,6 @@ def display_name(value: str) -> str:
     return value.replace("_", " ").title()
 
 
-def read_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8-sig"))
-
-
-def flat_customer_profiles(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    grouped_services: dict[str, set[str]] = {}
-
-    for row in rows:
-        project_name = str(
-            row.get("project_name") or row.get("project") or ""
-        ).strip()
-        service = str(row.get("service") or "").strip()
-        if not project_name or not service:
-            continue
-        grouped_services.setdefault(project_name, set()).add(service)
-
-    return [
-        {
-            "company_id": project_name,
-            "company_name": display_name(project_name),
-            "contacts": [],
-            "raw_customer_path": None,
-            "services": [
-                {"name": service, "aliases": []}
-                for service in sorted(services)
-            ],
-        }
-        for project_name, services in sorted(grouped_services.items())
-    ]
-
-
-def local_customer_records() -> list[dict[str, Any]]:
-    profiles: list[dict[str, Any]] = []
-    flat_rows: list[dict[str, Any]] = []
-
-    for path in sorted(CUSTOMER_PROFILES_DIR.glob("*.json")):
-        payload = read_json(path)
-        if isinstance(payload, list):
-            flat_rows.extend(row for row in payload if isinstance(row, dict))
-        elif isinstance(payload, dict):
-            if "company_id" in payload:
-                profiles.append(payload)
-            else:
-                flat_rows.append(payload)
-        else:
-            raise ValueError(f"Unsupported customer JSON root in {path}")
-
-    return [*profiles, *flat_customer_profiles(flat_rows)]
-
-
 def service_terms(service: dict[str, Any]) -> tuple[str, set[str]]:
     name = str(service["name"])
     aliases = [str(alias) for alias in service.get("aliases", [])]
@@ -183,37 +122,38 @@ def service_terms(service: dict[str, Any]) -> tuple[str, set[str]]:
 
 
 def data_source() -> str:
-    source = os.environ.get("DATA_SOURCE", "local").strip().casefold()
-    if source not in {"local", "bigquery"}:
-        raise RuntimeError("DATA_SOURCE must be either 'local' or 'bigquery'.")
+    source = os.environ.get("DATA_SOURCE", "bigquery").strip().casefold()
+    if source != "bigquery":
+        raise RuntimeError("DATA_SOURCE must be 'bigquery'; local data was removed.")
     return source
 
 
-def resolve_data_path(value: Any, default_directory: Path, default_name: str) -> Path:
-    candidate = Path(str(value or default_name))
-    if candidate.is_absolute():
-        return candidate
-
-    root_relative = ROOT / candidate
-    if root_relative.exists() or candidate.parent != Path("."):
-        return root_relative
-    return default_directory / candidate.name
+def resolve_data_path(
+    value: Any,
+    default_name: str,
+    *,
+    bucket_name: str | None = None,
+) -> str:
+    """Return a cloud object URI without falling back to repository files."""
+    location = str(value or default_name).strip()
+    if not location or location.startswith("gs://") or not bucket_name:
+        return location
+    normalized_bucket = bucket_name.removeprefix("gs://").strip("/")
+    return f"gs://{normalized_bucket}/{location.lstrip('/')}"
 
 
 def customer_records() -> list[dict[str, Any]]:
-    if data_source() == "bigquery":
-        from .bigquery import load_customer_records
+    data_source()
+    from .bigquery import load_customer_records
 
-        return load_customer_records()
-    return local_customer_records()
+    return load_customer_records()
 
 
 def msa_records() -> list[dict[str, Any]]:
-    if data_source() == "bigquery":
-        from .bigquery import load_msa_records
+    data_source()
+    from .bigquery import load_msa_records
 
-        return load_msa_records()
-    return [read_json(path) for path in sorted(MSA_PROFILES_DIR.glob("*.json"))]
+    return load_msa_records()
 
 
 def load_customer_profiles() -> dict[str, CustomerProfile]:
@@ -223,8 +163,7 @@ def load_customer_profiles() -> dict[str, CustomerProfile]:
         company_id = normalize_name(str(payload["company_id"]))
         raw_customer_path = resolve_data_path(
             payload.get("raw_customer_path"),
-            CUSTOMER_RAW_DIR,
-            f"{company_id}.txt",
+            "",
         )
         services = dict(service_terms(service) for service in payload.get("services", []))
         profiles[company_id] = CustomerProfile(
@@ -245,8 +184,8 @@ def load_msa_profiles() -> dict[str, MsaProfile]:
         msa_id = str(payload["msa_id"])
         raw_msa_path = resolve_data_path(
             payload.get("raw_msa_path"),
-            RAW_MSA_DIR,
             f"{msa_id}.txt",
+            bucket_name=os.environ.get("MSA_DATA_BUCKET"),
         )
         affected_services = dict(
             service_terms(service) for service in payload.get("affected_services", [])
@@ -266,11 +205,24 @@ def load_msa_profiles() -> dict[str, MsaProfile]:
     return profiles
 
 
-def read_text(path: Path) -> str:
-    if not path.exists():
+@lru_cache(maxsize=256)
+def read_text(path: str) -> str:
+    """Read an MSA body from GCS; non-cloud legacy paths have no local fallback."""
+    location = str(path)
+    if not location.startswith("gs://"):
         return ""
 
-    return path.read_text(encoding="utf-8-sig", errors="replace")
+    bucket_and_object = location.removeprefix("gs://")
+    bucket_name, separator, object_name = bucket_and_object.partition("/")
+    if not separator or not bucket_name or not object_name:
+        raise ValueError(f"Invalid Cloud Storage URI: {location!r}")
+
+    try:
+        from google.cloud import storage
+
+        return storage.Client().bucket(bucket_name).blob(object_name).download_as_text()
+    except Exception as exc:
+        raise RuntimeError(f"Failed to read MSA text from {location}: {exc}") from exc
 
 
 def extract_prefixed_line(text: str, prefix: str, fallback: str) -> str:

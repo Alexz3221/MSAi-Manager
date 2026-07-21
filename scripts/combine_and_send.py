@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from msai_core import matching
-from msai_core.matching import build_matches, load_customer_profiles
+from msai_core.matching import load_customer_profiles
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,8 +33,8 @@ class Notification:
     requires_customer_action: bool
     summary: str
     actions: list[str]
-    customer_raw_path: Path
-    raw_msa_path: Path
+    customer_raw_path: str
+    raw_msa_path: str
     matching_services: list[str]
     queue_client_id: str | None = None
 
@@ -70,33 +70,6 @@ def load_dotenv(path: Path = DOTENV_PATH) -> None:
         os.environ.setdefault(key, value)
 
 
-def build_local_notifications() -> list[Notification]:
-    customer_profiles = load_customer_profiles()
-    notifications: list[Notification] = []
-
-    for profile in customer_profiles.values():
-        for match in build_matches(profile.company_id):
-            notifications.append(
-                Notification(
-                    account=profile.company_name,
-                    contacts=profile.contacts,
-                    msa_id=match.msa_id,
-                    subject=match.subject,
-                    date=match.date,
-                    distribution_date=match.distribution_date,
-                    effective_date=match.effective_date,
-                    requires_customer_action=match.requires_customer_action,
-                    summary=match.summary,
-                    actions=match.actions,
-                    customer_raw_path=profile.raw_customer_path,
-                    raw_msa_path=match.raw_msa_path,
-                    matching_services=match.matching_services,
-                )
-            )
-
-    return notifications
-
-
 def notification_from_queue_record(
     record: dict[str, Any],
     customer_profiles: dict[str, matching.CustomerProfile],
@@ -116,8 +89,8 @@ def notification_from_queue_record(
 
     raw_msa_path = matching.resolve_data_path(
         record.get("raw_msa_path"),
-        matching.RAW_MSA_DIR,
         f"{msa_id}.txt",
+        bucket_name=os.environ.get("MSA_DATA_BUCKET"),
     )
     affected_services = dict(
         matching.service_terms(service)
@@ -203,12 +176,11 @@ def build_notifications(
     as_of: date | None = None,
     invalid_queue_entries: list[str] | None = None,
 ) -> list[Notification]:
-    if matching.data_source() == "bigquery":
-        return build_queue_notifications(
-            as_of or date.today(),
-            invalid_entries=invalid_queue_entries,
-        )
-    return build_local_notifications()
+    matching.data_source()
+    return build_queue_notifications(
+        as_of or date.today(),
+        invalid_entries=invalid_queue_entries,
+    )
 
 
 def claim_notification(notification: Notification, as_of: date) -> bool:
@@ -572,9 +544,6 @@ def main() -> None:
             "--consume-queue requires at least one explicit --recipient; the "
             "default address is only for test routing."
         )
-    if args.consume_queue and source != "bigquery":
-        parser.error("--consume-queue requires DATA_SOURCE=bigquery.")
-
     recipients = args.recipient or DEFAULT_TEST_RECIPIENTS
     invalid_queue_entries: list[str] = []
 
