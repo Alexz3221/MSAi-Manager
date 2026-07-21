@@ -5,9 +5,6 @@ from google.cloud import bigquery, storage
 storage_client = storage.Client()
 bq_client = bigquery.Client()
 
-BUCKET_NAME = "dummy_client_bucket"
-FILE_PATH = "raw_client_data/sprinternship_bld_2026.txt" 
-
 DATASET_ID = "msa_manager"
 TABLE_ID = "customer_profiles"
 STAGING_TABLE_ID = "customer_profiles_staging"
