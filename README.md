@@ -105,9 +105,7 @@ project/notice join. Build and verify that fixture before starting the
 interactive agent:
 
 ```powershell
-python -m scripts.seed_john_demo
-python -m services.john.john_agent.query
-python -m services.john.john_agent.agent
+DATA_SOURCE=bigquery python3 -m services.john.john_agent.agent
 ```
 
 The first two commands do not require Google credentials. The interactive
