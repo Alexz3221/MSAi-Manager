@@ -9,8 +9,22 @@ on:
 
 jobs:
   unit-tests:
-    name: Unit Tests
+    name: Unit Tests (${{ matrix.suite }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: full-suite
+            command: python -m unittest discover -s tests
+          - suite: service-pull
+            command: python -m unittest tests.test_service_pull
+          - suite: queue-email
+            command: python -m unittest tests.test_combine_and_send
+          - suite: cloud-data
+            command: python -m unittest tests.test_data_sources
+          - suite: web-john
+            command: python -m unittest tests.test_rate_limit tests.test_request_logging tests.test_john_runtime
 
     steps:
       - name: Check out repository
@@ -28,5 +42,5 @@ jobs:
           python -m pip install -e .
           python -m pip install -r requirements.txt
 
-      - name: Run unit tests
-        run: python -m unittest discover -s tests
+      - name: Run ${{ matrix.suite }} tests
+        run: ${{ matrix.command }}
