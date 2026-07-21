@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import os
-import tempfile
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -171,7 +169,7 @@ class ServicePullTests(unittest.TestCase):
         ):
             service_pull.query_assets("customer-project", client=client)
 
-    def test_local_writer_preserves_raw_asset_format(self) -> None:
+    def test_export_maps_assets_to_cloud_profile_keywords(self) -> None:
         export = service_pull.AssetExport(
             account="sample_customer",
             client_id="customer-project",
@@ -184,18 +182,86 @@ class ServicePullTests(unittest.TestCase):
             ],
         )
 
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            root = Path(temporary_directory)
-            raw_path = service_pull.write_raw_export(export, root / "raw")
-            raw_content = raw_path.read_text(encoding="utf-8")
-
         self.assertEqual(
-            raw_content,
-            "//bigquery.googleapis.com/projects/customer-project/"
-            "datasets/data/tables/events bigquery.googleapis.com/Table\n",
+            service_pull.raw_export_text(export),
+            "Account: sample_customer\n"
+            "Client ID: customer-project\n"
+            "Active services:\n"
+            "- bigquery\n",
         )
 
-    def test_bucket_upload_only_writes_raw_asset_text(self) -> None:
+    def test_common_api_domains_are_mapped_and_deduplicated(self) -> None:
+        export = service_pull.AssetExport(
+            account="sprinternship_bld_2026",
+            client_id="sprinternship-bld-2026",
+            assets=[
+                service_pull.AssetRecord(
+                    name=f"//{api_name}/projects/demo/resources/item",
+                    asset_type=f"{api_name}/Resource",
+                )
+                for api_name in (
+                    "bigquerydatatransfer.googleapis.com",
+                    "cloudbuild.googleapis.com",
+                    "cloudscheduler.googleapis.com",
+                    "secretmanager.googleapis.com",
+                    "cloudbuild.googleapis.com",
+                )
+            ],
+        )
+
+        output = service_pull.raw_export_text(export)
+
+        self.assertEqual(
+            output,
+            "Account: sprinternship_bld_2026\n"
+            "Client ID: sprinternship-bld-2026\n"
+            "Active services:\n"
+            "- bigquery data transfer\n"
+            "- cloud build\n"
+            "- cloud scheduler\n"
+            "- secret manager\n",
+        )
+        self.assertNotIn("googleapis.com", output)
+
+    def test_unmapped_api_uses_a_clean_domain_fallback(self) -> None:
+        self.assertEqual(
+            service_pull.keyword_for_asset(
+                "//network-security.googleapis.com/projects/demo/resources/item",
+                "network-security.googleapis.com/Resource",
+            ),
+            "network security",
+        )
+
+    def test_export_is_accepted_by_cloud_asset_checker(self) -> None:
+        export = service_pull.AssetExport(
+            account="sample_customer",
+            client_id="customer-project",
+            assets=[
+                service_pull.AssetRecord(
+                    name="//storage.googleapis.com/customer-bucket",
+                    asset_type="storage.googleapis.com/Bucket",
+                )
+            ],
+        )
+
+        with (
+            patch("google.cloud.storage.Client"),
+            patch("google.cloud.bigquery.Client"),
+        ):
+            from scripts import asset_checker
+
+        self.assertEqual(
+            asset_checker.transform_txt_to_dict(
+                service_pull.raw_export_text(export)
+            ),
+            {
+                "account": "sample_customer",
+                "client_id": "customer-project",
+                "active_services": ["cloud storage"],
+            },
+        )
+
+    def test_bucket_upload_writes_normalized_cloud_profile(self) -> None:
         export = service_pull.AssetExport(
             account="sample_customer",
             client_id="customer-project",
@@ -226,8 +292,10 @@ class ServicePullTests(unittest.TestCase):
         )
         self.assertEqual(
             client.uploads["raw_client_data/sample_customer.txt"][0],
-            "//storage.googleapis.com/customer-bucket "
-            "storage.googleapis.com/Bucket\n",
+            "Account: sample_customer\n"
+            "Client ID: customer-project\n"
+            "Active services:\n"
+            "- cloud storage\n",
         )
 
     def test_bucket_upload_errors_fail_the_run(self) -> None:

@@ -136,20 +136,21 @@ def load_customer_records() -> list[dict[str, Any]]:
     return _query_records(
         f"""
         SELECT
-          client_id AS company_id,
-          account   AS company_name,
+          TRIM(client_id) AS company_id,
+          COALESCE(NULLIF(TRIM(account), ''), TRIM(client_id)) AS company_name,
           ARRAY<STRING>[] AS contacts,
           CAST(NULL AS STRING) AS raw_customer_path,
           ARRAY(
             SELECT AS STRUCT
-              TRIM(svc) AS name,
+              TRIM(service) AS name,
               ARRAY<STRING>[] AS aliases
-            FROM UNNEST(active_services) AS svc
-            WHERE NULLIF(TRIM(svc), '') IS NOT NULL
+            FROM UNNEST(active_services) AS service
+            WHERE NULLIF(TRIM(service), '') IS NOT NULL
+            ORDER BY service
           ) AS services
         FROM `{project}.{dataset}.{customer_table}`
         WHERE NULLIF(TRIM(client_id), '') IS NOT NULL
-        ORDER BY account
+        ORDER BY company_id
         """
     )
 

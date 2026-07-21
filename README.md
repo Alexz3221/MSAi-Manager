@@ -15,18 +15,16 @@ a filterable web feed and can prepare notification email previews.
 ## Prototype snapshot
 
 - The web app is deployed on Cloud Run.
-- Structured customer and MSA profiles can be read from local JSON or BigQuery.
-- The deployed service uses `DATA_SOURCE=bigquery`.
+- Customer and MSA profiles are read from BigQuery.
 - BigQuery project: `sprinternship-bld-2026`
 - Dataset: `msa_manager`
 - Canonical tables: `msa_manager.customer_profiles` and
   `msa_manager.msa_updates`; delivery queue: `msa_dataset.msa_daily_queue`
-- `customer_profiles` stores flat `project`, `service`, and `raw_uri` rows;
-  the application groups them into project profiles when reading.
+- `customer_profiles` stores `account`, `client_id`, and `active_services`; the
+  application converts each service into its matching profile representation.
 - The tables may be empty during development, in which case the feed correctly
   returns zero results.
-- Local fixtures remain in the repository; the deployed Pub/Sub ingestion path
-  can read new raw MSA text from Cloud Storage.
+- Raw MSA text and customer-profile exports live in Cloud Storage.
 
 ## Draft service outline
 
@@ -55,8 +53,6 @@ services/john/john_agent/         John conversational-agent prototype
 scripts/                          ingestion, asset, and notification commands
 sql/                              local demo and future warehouse schemas
 tests/                            unit and request-level tests
-customer_data/                    local customer fixtures
-msa_data/                         local MSA fixtures
 app.py                            compatibility entry point used by Cloud Run
 ```
 
@@ -65,15 +61,6 @@ other. Each deployable component has its own requirements file. The root
 `requirements.txt` installs the complete development toolset, while the root
 `Dockerfile` installs the web, John, and script requirements so the same image
 can run either the service or a Cloud Run Job.
-
-Data is organized under:
-
-```text
-customer_data/raw/
-customer_data/customer_keywords_cleaned/
-msa_data/raw/
-msa_data/msa_keywords_cleaned/
-```
 
 ## Local quick start
 
@@ -152,10 +139,9 @@ created.
 
 ## Data-source settings
 
-Copy `.env.example` to `.env`, then choose `DATA_SOURCE=local` or
-`DATA_SOURCE=bigquery`. The example defaults to local JSON. Its BigQuery values
-already point to the prototype dataset, so BigQuery mode only requires changing
-`DATA_SOURCE` and configuring credentials.
+Copy `.env.example` to `.env` and configure Application Default Credentials.
+The application is cloud-only: `DATA_SOURCE` defaults to `bigquery` and rejects
+the removed local mode.
 
 Process environment variables can still override the file, for example:
 
@@ -167,6 +153,7 @@ $env:BQ_CUSTOMERS_TABLE = "customer_profiles"
 $env:BQ_MSA_UPDATES_TABLE = "msa_updates"
 $env:BQ_QUEUE_DATASET = "msa_dataset"
 $env:BQ_DAILY_QUEUE_TABLE = "msa_daily_queue"
+$env:MSA_DATA_BUCKET = "your-msa-bucket"
 python app.py
 ```
 
@@ -177,7 +164,9 @@ client libraries use Application Default
 Credentials. Cloud Run receives credentials from its assigned service account;
 local development requires separately configured credentials.
 
-The tracked `.env.example` lists non-secret settings for both services. The
+`MSA_DATA_BUCKET` resolves legacy `raw_msa_path` values that contain only an
+object name. Newly ingested MSA rows store a complete `gs://` URI. The tracked
+`.env.example` lists non-secret settings for both services. The
 ignored root `.env` is loaded for local development without overriding values
 already supplied by the process. Cloud Run therefore continues to use its
 configured environment variables. BigQuery tables are populated by external
@@ -196,19 +185,21 @@ python -m scripts.combine_and_send --help
 ### Cloud Asset customer export
 
 `scripts.service_pull` queries real Cloud Asset Inventory data and fails if
-credentials, permissions, scope, or uploads fail. It never substitutes mock
-data or converts the result into a customer-profile JSON document. With a
-bucket configured, it uploads one raw text object:
+credentials, permissions, scope, or uploads fail. It maps Cloud Asset API names
+to matching keywords and uploads one customer-profile text object:
 
 ```text
 gs://BUCKET/raw_client_data/ACCOUNT.txt
 ```
 
-Each line preserves the Cloud Asset Inventory resource name and asset type in
-the same raw format consumed by `scripts.asset_checker`:
+The format is consumed directly by `scripts.asset_checker`:
 
 ```text
-//storage.googleapis.com/example-bucket storage.googleapis.com/Bucket
+Account: example_customer
+Client ID: customer-project-id
+Active services:
+- bigquery
+- cloud storage
 ```
 
 Run a local export to the bucket shown in the Cloud Console:
@@ -217,8 +208,7 @@ Run a local export to the bucket shown in the Cloud Console:
 python -m scripts.service_pull `
   --client-id sprinternship-bld-2026 `
   --account-name example_customer `
-  --bucket dummy_client_bucket `
-  --no-local-output
+  --bucket dummy_client_bucket
 ```
 
 Email-principal searches also require a scope such as
@@ -230,7 +220,7 @@ container command and arguments:
 
 ```text
 Command: python
-Arguments: -m, scripts.service_pull, --no-local-output
+Arguments: -m, scripts.service_pull
 ```
 
 Configure these job environment variables:
@@ -283,10 +273,10 @@ A process that exits after claiming but before recording success or failure can
 leave a row in `processing`, so operational recovery must reset that row to
 `failed` before rerunning the same date.
 
-`scripts.asset_checker` and `scripts.msa_keyword_extractor` currently perform
-work when imported and should only be run intentionally. Local generated output
-stays under the root data or ignored `outputs/` directories; `service_pull` can
-also write directly to its configured bucket.
+`scripts.asset_checker` moves normalized customer profiles from Cloud Storage
+through a BigQuery staging table, and `scripts.msa_keyword_extractor` writes MSA
+profiles from Cloud Storage to BigQuery. Notification previews remain the only
+repository-local runtime artifacts and are written under ignored `outputs/`.
 
 ## Useful endpoints
 

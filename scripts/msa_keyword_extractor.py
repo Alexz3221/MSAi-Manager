@@ -16,9 +16,6 @@ from google.cloud import storage, bigquery
 _gcs = storage.Client()
 _bq = bigquery.Client()
 
-ROOT = Path(__file__).resolve().parents[1]
-MSA_KEYWORDS_DIR = ROOT / "msa_data" / "msa_keywords_cleaned"
-
 # canonical name -> surface forms seen in the wild
 #test commut
 SERVICE_ALIASES = {
@@ -191,7 +188,7 @@ def parse_msa_file(bucket_name, blob_name):
 
     return {
         "msa_id": msa_id,
-        "raw_msa_path": blob_name,
+        "raw_msa_path": f"gs://{bucket_name}/{blob_name}",
         "format": "account_team" if "Account Team MSA Notification" in text else "internal",
         "sent_date": to_iso(re.sub(r"^\w{3}, ", "", sent.group(1)).split(" at ")[0])
                      if sent else None,

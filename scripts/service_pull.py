@@ -11,9 +11,59 @@ from dotenv import load_dotenv
 from google.cloud import asset_v1, storage
 
 ROOT = Path(__file__).resolve().parents[1]
-CUSTOMER_RAW_DIR = ROOT / "customer_data" / "raw"
 DEFAULT_RAW_PREFIX = "raw_client_data"
 ACCOUNT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$")
+ASSET_SERVICE_PATTERN = re.compile(r"^//([a-z0-9.-]+\.googleapis\.com)(?:/|$)")
+ASSET_TYPE_SERVICE_PATTERN = re.compile(
+    r"^([a-z0-9.-]+\.googleapis\.com)(?:/|$)"
+)
+
+API_TO_KEYWORD_MAP: dict[str, str] = {
+    "compute.googleapis.com": "compute engine",
+    "container.googleapis.com": "google kubernetes engine",
+    "run.googleapis.com": "cloud run",
+    "cloudfunctions.googleapis.com": "cloud functions",
+    "appengine.googleapis.com": "app engine",
+    "storage.googleapis.com": "cloud storage",
+    "storage-api.googleapis.com": "cloud storage api",
+    "storage-component.googleapis.com": "cloud storage component",
+    "bigquery.googleapis.com": "bigquery",
+    "bigquerydatatransfer.googleapis.com": "bigquery data transfer",
+    "dataplex.googleapis.com": "dataplex (knowledge catalog)",
+    "sqladmin.googleapis.com": "cloud sql",
+    "sql-component.googleapis.com": "cloud sql component",
+    "redis.googleapis.com": "memorystore for redis",
+    "bigtableadmin.googleapis.com": "cloud bigtable",
+    "firestore.googleapis.com": "firestore",
+    "datastore.googleapis.com": "datastore",
+    "pubsub.googleapis.com": "pub/sub",
+    "apigee.googleapis.com": "apigee",
+    "dataflow.googleapis.com": "dataflow",
+    "composer.googleapis.com": "cloud composer",
+    "cloudbuild.googleapis.com": "cloud build",
+    "cloudscheduler.googleapis.com": "cloud scheduler",
+    "artifactregistry.googleapis.com": "artifact registry",
+    "containerregistry.googleapis.com": "container registry",
+    "dataform.googleapis.com": "dataform",
+    "containeranalysis.googleapis.com": "container analysis",
+    "staging-containeranalysis.sandbox.googleapis.com": (
+        "container analysis (staging)"
+    ),
+    "serviceusage.googleapis.com": "service usage",
+    "cloudresourcemanager.googleapis.com": "cloud resource manager",
+    "cloudbilling.googleapis.com": "cloud billing",
+    "orgpolicy.googleapis.com": "organization policy",
+    "iam.googleapis.com": "identity and access management",
+    "iap.googleapis.com": "identity aware proxy",
+    "cloudasset.googleapis.com": "cloud asset inventory",
+    "secretmanager.googleapis.com": "secret manager",
+    "logging.googleapis.com": "cloud logging",
+    "monitoring.googleapis.com": "cloud monitoring",
+    "cloudtrace.googleapis.com": "cloud trace",
+    "telemetry.googleapis.com": "telemetry",
+    "cloudapis.googleapis.com": "google cloud apis",
+    "aiplatform.googleapis.com": "vertex ai",
+}
 
 load_dotenv(ROOT / ".env")
 
@@ -22,6 +72,10 @@ load_dotenv(ROOT / ".env")
 class AssetRecord:
     name: str
     asset_type: str
+
+    @property
+    def service_keyword(self) -> str:
+        return keyword_for_asset(self.name, self.asset_type)
 
 
 @dataclass(frozen=True)
@@ -47,6 +101,27 @@ def validate_account_name(account_name: str) -> str:
 def project_id_from_resource(resource: str) -> str | None:
     match = re.search(r"(?:^|/)projects/([^/]+)", resource)
     return match.group(1) if match else None
+
+
+def keyword_for_asset(asset_name: str, asset_type: str) -> str:
+    """Return a compact keyword without exposing a raw Google API domain."""
+    type_match = ASSET_TYPE_SERVICE_PATTERN.match(asset_type.casefold())
+    name_match = ASSET_SERVICE_PATTERN.match(asset_name.casefold())
+    api_name = (
+        type_match.group(1)
+        if type_match
+        else name_match.group(1) if name_match else None
+    )
+    if not api_name:
+        return "Unknown Service"
+
+    mapped_keyword = API_TO_KEYWORD_MAP.get(api_name)
+    if mapped_keyword:
+        return mapped_keyword
+
+    # Keep newly introduced APIs useful until an explicit human-friendly
+    # mapping is added. The export never leaks the `.googleapis.com` suffix.
+    return api_name.removesuffix(".googleapis.com").replace("-", " ")
 
 
 def project_ids_for_principal(
@@ -145,22 +220,21 @@ def build_export(
 
 
 def raw_export_text(export: AssetExport) -> str:
-    """Serialize assets in the raw ``RESOURCE_NAME ASSET_TYPE`` format."""
-    if not export.assets:
-        return ""
-    return "\n".join(
-        f"{asset.name} {asset.asset_type}" for asset in export.assets
-    ) + "\n"
-
-
-def write_raw_export(
-    export: AssetExport,
-    directory: Path = CUSTOMER_RAW_DIR,
-) -> Path:
-    directory.mkdir(parents=True, exist_ok=True)
-    output_path = directory / f"{export.account}.txt"
-    output_path.write_text(raw_export_text(export), encoding="utf-8")
-    return output_path
+    """Serialize the cloud customer profile consumed by ``asset_checker``."""
+    keywords = sorted(
+        {
+            asset.service_keyword
+            for asset in export.assets
+            if asset.service_keyword != "Unknown Service"
+        }
+    )
+    lines = [
+        f"Account: {export.account}",
+        f"Client ID: {export.client_id}",
+        "Active services:",
+        *(f"- {keyword}" for keyword in keywords),
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def normalize_bucket_name(value: str) -> str:
@@ -204,8 +278,8 @@ def upload_raw_export(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Pull raw asset names and types from Cloud Asset Inventory "
-        "and write them locally, to GCS, or both."
+        description="Discover assets with Cloud Asset Inventory "
+        "and upload a normalized customer profile to Cloud Storage."
     )
     parser.add_argument(
         "--client-id",
@@ -235,35 +309,22 @@ def main() -> None:
         default=os.environ.get("CUSTOMER_RAW_PREFIX", DEFAULT_RAW_PREFIX),
         help=f"Raw object prefix (default: {DEFAULT_RAW_PREFIX}).",
     )
-    parser.add_argument(
-        "--no-local-output",
-        action="store_true",
-        help=(
-            "Do not write repository-local output files "
-            "(recommended for Cloud Run Jobs)."
-        ),
-    )
     args = parser.parse_args()
 
     if not args.client_id:
         parser.error("Provide --client-id or set CUSTOMER_CLIENT_ID.")
-    if args.no_local_output and not args.bucket:
-        parser.error("--no-local-output requires --bucket or CUSTOMER_DATA_BUCKET.")
+    if not args.bucket:
+        parser.error("Provide --bucket or set CUSTOMER_DATA_BUCKET.")
 
     account_name = args.account_name or args.client_id
     export = build_export(account_name, args.client_id, scope=args.scope)
 
-    if not args.no_local_output:
-        raw_path = write_raw_export(export)
-        print(f"Wrote {raw_path}")
-
-    if args.bucket:
-        raw_uri = upload_raw_export(
-            export,
-            args.bucket,
-            raw_prefix=args.raw_prefix,
-        )
-        print(f"Uploaded {raw_uri}")
+    raw_uri = upload_raw_export(
+        export,
+        args.bucket,
+        raw_prefix=args.raw_prefix,
+    )
+    print(f"Uploaded {raw_uri}")
 
 
 if __name__ == "__main__":

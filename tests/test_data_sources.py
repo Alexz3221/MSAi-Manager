@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import json
 import os
-import tempfile
 import unittest
 from datetime import date
-from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import msai_core
 from msai_core import bigquery, matching
@@ -15,7 +12,7 @@ from services.web import app
 
 
 class BigQueryCustomerQueryTests(unittest.TestCase):
-    def test_flat_customer_rows_are_grouped_for_the_application(self) -> None:
+    def test_cloud_customer_profiles_are_shaped_for_the_application(self) -> None:
         sentinel = [{"company_id": "demo"}]
 
         with (
@@ -33,12 +30,10 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
             self.assertEqual(bigquery.load_customer_records(), sentinel)
 
         sql = query.call_args.args[0]
-        self.assertIn("TRIM(project) AS project_name", sql)
-        self.assertNotIn("TRIM(project_name)", sql)
-        self.assertIn("project_name AS company_id", sql)
-        self.assertIn("STRUCT(service AS name", sql)
-        self.assertIn("GROUP BY project_name", sql)
-        self.assertNotIn("SELECT company_id, company_name", sql)
+        self.assertIn("TRIM(client_id) AS company_id", sql)
+        self.assertIn("TRIM(account)", sql)
+        self.assertIn("UNNEST(active_services)", sql)
+        self.assertNotIn("TRIM(project)", sql)
 
     def test_empty_customers_and_one_msa_produce_healthy_empty_feed(self) -> None:
         msa_record = {
@@ -210,46 +205,41 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
         self.assertNotIn("TIMESTAMP_SUB", sql)
 
 
-class LocalCustomerDataTests(unittest.TestCase):
-    def test_legacy_and_flat_customer_documents_load_together(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            directory = Path(temp_dir)
-            (directory / "legacy.json").write_text(
-                json.dumps(
-                    {
-                        "company_id": "legacy_customer",
-                        "company_name": "Legacy Customer",
-                        "contacts": ["legal@example.com"],
-                        "raw_customer_path": "customer_data/raw/legacy_customer.txt",
-                        "services": [{"name": "bigquery", "aliases": ["bq"]}],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            (directory / "assets.json").write_text(
-                json.dumps(
-                    [
-                        {
-                            "project": "asset-project",
-                            "service": "cloud storage",
-                            "raw_uri": "//storage.googleapis.com/buckets/demo",
-                        },
-                        {"project": "asset-project", "service": "bigquery"},
-                        {"project": "asset-project", "service": "bigquery"},
-                    ]
-                ),
-                encoding="utf-8",
-            )
+class CloudOnlyDataTests(unittest.TestCase):
+    def test_bigquery_is_the_default_and_local_mode_is_rejected(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(matching.data_source(), "bigquery")
 
-            with (
-                patch.object(matching, "CUSTOMER_PROFILES_DIR", directory),
-                patch.dict(os.environ, {"DATA_SOURCE": "local"}, clear=False),
-            ):
-                profiles = matching.load_customer_profiles()
+        with patch.dict(os.environ, {"DATA_SOURCE": "local"}, clear=False):
+            with self.assertRaisesRegex(RuntimeError, "local data was removed"):
+                matching.data_source()
 
-        self.assertEqual(set(profiles), {"legacy_customer", "asset_project"})
-        self.assertEqual(set(profiles["asset_project"].services), {"bigquery", "cloud storage"})
-        self.assertEqual(profiles["asset_project"].contacts, [])
+    def test_relative_msa_object_resolves_to_gcs(self) -> None:
+        self.assertEqual(
+            matching.resolve_data_path(
+                "raw_msa/notice.txt",
+                "notice.txt",
+                bucket_name="msa-bucket",
+            ),
+            "gs://msa-bucket/raw_msa/notice.txt",
+        )
+
+    def test_msa_text_is_downloaded_from_gcs(self) -> None:
+        storage_client = MagicMock()
+        storage_client.bucket.return_value.blob.return_value.download_as_text.return_value = (
+            "MSA body"
+        )
+        matching.read_text.cache_clear()
+
+        with patch("google.cloud.storage.Client", return_value=storage_client):
+            body = matching.read_text("gs://msa-bucket/raw_msa/notice.txt")
+
+        self.assertEqual(body, "MSA body")
+        storage_client.bucket.assert_called_once_with("msa-bucket")
+        storage_client.bucket.return_value.blob.assert_called_once_with(
+            "raw_msa/notice.txt"
+        )
+        matching.read_text.cache_clear()
 
 
 class PackageBoundaryTests(unittest.TestCase):

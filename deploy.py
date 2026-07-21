@@ -15,7 +15,7 @@ remote = agent_engines.create(
         "google-cloud-bigquery",
         "requests",
     ],
-    extra_packages=["chatbot", "msa_data/raw"],
+    extra_packages=["chatbot"],
     env_vars={"DATA_SOURCE": "bigquery"},
 )
 print(remote.resource_name)
