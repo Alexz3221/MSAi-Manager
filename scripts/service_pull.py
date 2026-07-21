@@ -309,6 +309,11 @@ def main() -> None:
         default=os.environ.get("CUSTOMER_RAW_PREFIX", DEFAULT_RAW_PREFIX),
         help=f"Raw object prefix (default: {DEFAULT_RAW_PREFIX}).",
     )
+    parser.add_argument(
+        "--no-local-output",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     args = parser.parse_args()
 
     if not args.client_id:

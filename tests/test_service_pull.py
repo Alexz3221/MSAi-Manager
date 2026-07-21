@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -65,6 +66,44 @@ def asset(name: str, asset_type: str):
 
 
 class ServicePullTests(unittest.TestCase):
+    def test_legacy_no_local_output_argument_is_a_cloud_only_noop(self) -> None:
+        export = service_pull.AssetExport(
+            account="sample_customer",
+            client_id="customer-project",
+            assets=[],
+        )
+
+        with (
+            patch.object(
+                sys,
+                "argv",
+                [
+                    "service_pull",
+                    "--client-id",
+                    "customer-project",
+                    "--account-name",
+                    "sample_customer",
+                    "--bucket",
+                    "customer-bucket",
+                    "--no-local-output",
+                ],
+            ),
+            patch.object(service_pull, "build_export", return_value=export),
+            patch.object(
+                service_pull,
+                "upload_raw_export",
+                return_value="gs://customer-bucket/raw_client_data/sample_customer.txt",
+            ) as upload,
+            patch("builtins.print"),
+        ):
+            service_pull.main()
+
+        upload.assert_called_once_with(
+            export,
+            "customer-bucket",
+            raw_prefix="raw_client_data",
+        )
+
     def test_project_lookup_returns_sorted_raw_assets(self) -> None:
         client = FakeAssetClient(
             project_assets={
