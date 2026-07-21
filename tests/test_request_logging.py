@@ -86,7 +86,7 @@ class RequestLoggingTests(unittest.TestCase):
         expected = {
             "session_id": "existing-session",
             "reply": "One notice matches.",
-            "tools": ["find_msas_affecting_my_projects"],
+            "tools": ["find_msas_for_customer"],
         }
 
         with (
