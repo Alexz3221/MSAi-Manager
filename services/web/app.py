@@ -29,7 +29,7 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 JOHN_RUNTIME = JohnRuntime()
 MAX_JOHN_MESSAGE_LENGTH = 4_000
-
+CUSTOMER_DATA_BUCKET = os.environ.get("CUSTOMER_DATA_BUCKET", "dummy_client_bucket")
 
 def bool_setting(name: str, default: bool) -> bool:
     value = os.environ.get(name, str(default)).strip().casefold()
@@ -1017,6 +1017,25 @@ class RequestHandler(BaseHTTPRequestHandler):
             blob_name = file_info["name"]
 
             if not blob_name.endswith(".txt"):
+                self.send_response(204)
+                self.end_headers()
+                return
+
+    
+            if bucket_name == CUSTOMER_DATA_BUCKET:
+                from scripts.asset_checker import (
+                    read_gcs_file,
+                    transform_txt_to_dict,
+                    merge_via_staging,
+                    DATASET_ID,
+                    TABLE_ID,
+                    STAGING_TABLE_ID,
+                )
+
+                raw_text = read_gcs_file(bucket_name, blob_name)
+                record = transform_txt_to_dict(raw_text)
+                merge_via_staging(DATASET_ID, TABLE_ID, STAGING_TABLE_ID, record)
+
                 self.send_response(204)
                 self.end_headers()
                 return
