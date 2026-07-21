@@ -58,26 +58,21 @@ def load_customer_records() -> list[dict[str, Any]]:
     project, dataset, customer_table, _ = bigquery_settings()
     return _query_records(
         f"""
-        WITH distinct_services AS (
-          SELECT DISTINCT
-            TRIM(project) AS project_name,
-            TRIM(service) AS service
-          FROM `{project}.{dataset}.{customer_table}`
-          WHERE NULLIF(TRIM(project), '') IS NOT NULL
-            AND NULLIF(TRIM(service), '') IS NOT NULL
-        )
         SELECT
-          project_name AS company_id,
-          project_name AS company_name,
+          client_id AS company_id,
+          account   AS company_name,
           ARRAY<STRING>[] AS contacts,
           CAST(NULL AS STRING) AS raw_customer_path,
-          ARRAY_AGG(
-            STRUCT(service AS name, ARRAY<STRING>[] AS aliases)
-            ORDER BY service
+          ARRAY(
+            SELECT AS STRUCT
+              TRIM(svc) AS name,
+              ARRAY<STRING>[] AS aliases
+            FROM UNNEST(active_services) AS svc
+            WHERE NULLIF(TRIM(svc), '') IS NOT NULL
           ) AS services
-        FROM distinct_services
-        GROUP BY project_name
-        ORDER BY project_name
+        FROM `{project}.{dataset}.{customer_table}`
+        WHERE NULLIF(TRIM(client_id), '') IS NOT NULL
+        ORDER BY account
         """
     )
 
