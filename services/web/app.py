@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import base64
+import datetime as dt
 import json
 import logging
 import os
+import sys
+import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -22,14 +25,82 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 HOST = "0.0.0.0"
 PORT = int(os.environ.get("PORT", "8080"))
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+SERVICE_NAME = os.environ.get("K_SERVICE", "msai-manager")
+ENVIRONMENT = os.environ.get("ENVIRONMENT", os.environ.get("APP_ENV", "prod"))
+PROJECT_ID = (
+    os.environ.get("GOOGLE_CLOUD_PROJECT")
+    or os.environ.get("BQ_PROJECT_ID")
+    or "sprinternship-bld-2026"
 )
+
+
+RESERVED_LOG_RECORD_FIELDS = set(logging.makeLogRecord({}).__dict__) | {
+    "message",
+    "asctime",
+}
+
+
+class JsonLogFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        payload: dict[str, object] = {
+            "severity": record.levelname,
+            "message": record.getMessage(),
+            "timestamp": dt.datetime.fromtimestamp(
+                record.created,
+                tz=dt.UTC,
+            ).isoformat(),
+            "logger": record.name,
+            "service": SERVICE_NAME,
+            "environment": ENVIRONMENT,
+        }
+
+        for key, value in record.__dict__.items():
+            if key not in RESERVED_LOG_RECORD_FIELDS and value is not None:
+                payload[key] = value
+
+        if record.exc_info:
+            exception_type = record.exc_info[0]
+            exception_value = record.exc_info[1]
+            payload["exception_type"] = (
+                exception_type.__name__ if exception_type else "Exception"
+            )
+            payload["exception_message"] = str(exception_value)
+            payload["stack_trace"] = "".join(traceback.format_exception(*record.exc_info))
+
+        return json.dumps(payload, default=str, separators=(",", ":"))
+
+
+def configure_logging() -> None:
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JsonLogFormatter())
+    logging.basicConfig(
+        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        handlers=[handler],
+        force=True,
+    )
+
+
+configure_logging()
 LOGGER = logging.getLogger(__name__)
 JOHN_RUNTIME = JohnRuntime()
 MAX_JOHN_MESSAGE_LENGTH = 4_000
 CUSTOMER_DATA_BUCKET = os.environ.get("CUSTOMER_DATA_BUCKET", "dummy_client_bucket")
+
+
+def cloud_trace_fields(trace_header: str | None) -> dict[str, str]:
+    if not trace_header:
+        return {"trace": "unavailable"}
+
+    trace_id = trace_header.split("/", 1)[0].split(";", 1)[0].strip()
+    if not trace_id:
+        return {"trace": "unavailable"}
+
+    fields = {"trace": trace_id}
+    if PROJECT_ID:
+        fields["logging.googleapis.com/trace"] = (
+            f"projects/{PROJECT_ID}/traces/{trace_id}"
+        )
+    return fields
 
 def bool_setting(name: str, default: bool) -> bool:
     value = os.environ.get(name, str(default)).strip().casefold()
@@ -856,12 +927,19 @@ def html_page() -> str:
 
 
 class RequestHandler(BaseHTTPRequestHandler):
+    def log_context(self, method: str) -> dict[str, object]:
+        parsed_url = urlparse(self.path)
+        return {
+            "http_method": method,
+            "path": parsed_url.path,
+            "event": "request_error",
+            **cloud_trace_fields(self.headers.get("X-Cloud-Trace-Context")),
+        }
+
     def log_exception(self, method: str) -> None:
         LOGGER.exception(
-            "Unhandled %s request error path=%s trace=%s",
-            method,
-            self.path,
-            self.headers.get("X-Cloud-Trace-Context", "unavailable"),
+            "Unhandled request error",
+            extra=self.log_context(method),
         )
 
     def send_json(
@@ -967,10 +1045,13 @@ class RequestHandler(BaseHTTPRequestHandler):
                 if not rate_limit.allowed:
                     retry_after = str(rate_limit.retry_after_seconds)
                     LOGGER.warning(
-                        "John rate limit reached reason=%s retry_after=%s trace=%s",
-                        rate_limit.reason,
-                        retry_after,
-                        self.headers.get("X-Cloud-Trace-Context", "unavailable"),
+                        "John rate limit reached",
+                        extra={
+                            **self.log_context("POST"),
+                            "event": "john_rate_limited",
+                            "rate_limit_reason": rate_limit.reason,
+                            "retry_after_seconds": rate_limit.retry_after_seconds,
+                        },
                     )
                     self.send_json(
                         429,
@@ -1047,10 +1128,13 @@ class RequestHandler(BaseHTTPRequestHandler):
 
             if errors:
                 LOGGER.error(
-                    "BigQuery insert failed path=%s trace=%s errors=%r",
-                    self.path,
-                    self.headers.get("X-Cloud-Trace-Context", "unavailable"),
-                    errors,
+                    "BigQuery insert failed",
+                    extra={
+                        **self.log_context("POST"),
+                        "event": "bigquery_insert_failed",
+                        "error_count": len(errors),
+                        "errors": errors,
+                    },
                 )
                 self.send_json(500, {"error": "Failed to write MSA profile"})
                 return
@@ -1069,7 +1153,10 @@ class RequestHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     server = ThreadingHTTPServer((HOST, PORT), RequestHandler)
-    print(f"MSAi Manager web app listening on http://{HOST}:{PORT}")
+    LOGGER.info(
+        "MSAi Manager web app started",
+        extra={"event": "server_started", "host": HOST, "port": PORT},
+    )
     server.serve_forever()
 
 

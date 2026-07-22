@@ -1,9 +1,11 @@
 import json
+import logging
 import re
 from google.cloud import bigquery, storage
 
 storage_client = storage.Client()
 bq_client = bigquery.Client()
+LOGGER = logging.getLogger(__name__)
 
 DATASET_ID = "msa_manager"
 TABLE_ID = "customer_profiles"
@@ -47,7 +49,13 @@ def merge_via_staging(
         write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
     )
 
-    print(f"Loading incoming record into staging table ({staging_ref})...")
+    LOGGER.info(
+        "Loading incoming customer profile into staging table",
+        extra={
+            "event": "customer_profile_staging_load_started",
+            "staging_table": staging_ref,
+        },
+    )
     load_job = bq_client.load_table_from_json(
         [record], staging_ref, job_config=load_config
     )
@@ -67,12 +75,22 @@ def merge_via_staging(
       VALUES (S.account, S.client_id, S.active_services)
     """
 
-    print(f"Merging staging data into main table ({target_ref})...")
+    LOGGER.info(
+        "Merging customer profile staging data",
+        extra={
+            "event": "customer_profile_merge_started",
+            "target_table": target_ref,
+        },
+    )
     query_job = bq_client.query(merge_query)
     query_job.result()  # Wait for query completion
 
-    print(
-        f"Successfully merged account '{record['account']}' into {target_ref}!"
+    LOGGER.info(
+        "Customer profile merged",
+        extra={
+            "event": "customer_profile_merged",
+            "target_table": target_ref,
+        },
     )
 
 

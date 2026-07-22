@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import unittest
 from urllib.error import HTTPError
@@ -42,7 +43,8 @@ class RequestLoggingTests(unittest.TestCase):
         self.assertEqual(payload, {"error": "Service unavailable"})
         logs = "\n".join(captured.output)
         self.assertIn("query detail", logs)
-        self.assertIn("test-get-trace", logs)
+        self.assertEqual(captured.records[0].trace, "test-get-trace")
+        self.assertEqual(captured.records[0].path, "/api/companies")
         self.assertNotIn("query detail", json.dumps(payload))
 
     def test_post_exception_is_logged_and_returns_generic_500(self) -> None:
@@ -65,7 +67,8 @@ class RequestLoggingTests(unittest.TestCase):
         self.assertEqual(payload, {"error": "Failed to process Pub/Sub message"})
         logs = "\n".join(captured.output)
         self.assertIn("JSONDecodeError", logs)
-        self.assertIn("test-post-trace", logs)
+        self.assertEqual(captured.records[0].trace, "test-post-trace")
+        self.assertEqual(captured.records[0].path, "/")
 
     def test_john_endpoint_returns_chat_payload(self) -> None:
         request = Request(
@@ -141,7 +144,7 @@ class RequestLoggingTests(unittest.TestCase):
         with (
             patch.object(app.JOHN_RATE_LIMITER, "check", return_value=decision),
             patch.object(app.JOHN_RUNTIME, "chat") as chat,
-            self.assertLogs(app.LOGGER.name, level="WARNING"),
+            self.assertLogs(app.LOGGER.name, level="WARNING") as captured,
         ):
             with self.assertRaises(HTTPError) as raised:
                 urlopen(request, timeout=5)
@@ -155,6 +158,10 @@ class RequestLoggingTests(unittest.TestCase):
                 "retry_after_seconds": 45,
             },
         )
+        warning = captured.records[0]
+        self.assertEqual(warning.event, "john_rate_limited")
+        self.assertEqual(warning.rate_limit_reason, "global")
+        self.assertEqual(warning.retry_after_seconds, 45)
         chat.assert_not_called()
 
     def test_john_endpoint_is_blocked_when_disabled(self) -> None:
@@ -187,6 +194,27 @@ class RequestLoggingTests(unittest.TestCase):
 
         self.assertIn("const johnEnabled = false;", page)
         self.assertIn('johnTab.textContent = "John (offline)";', page)
+
+    def test_json_log_formatter_outputs_cloud_logging_fields(self) -> None:
+        record = logging.makeLogRecord(
+            {
+                "name": "test.logger",
+                "levelno": logging.WARNING,
+                "levelname": "WARNING",
+                "msg": "Hello logging",
+                "args": (),
+                "event": "unit_test",
+                "trace": "trace-id",
+            }
+        )
+
+        payload = json.loads(app.JsonLogFormatter().format(record))
+
+        self.assertEqual(payload["severity"], "WARNING")
+        self.assertEqual(payload["message"], "Hello logging")
+        self.assertEqual(payload["logger"], "test.logger")
+        self.assertEqual(payload["event"], "unit_test")
+        self.assertEqual(payload["trace"], "trace-id")
 
 
 if __name__ == "__main__":
