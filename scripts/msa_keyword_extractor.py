@@ -7,6 +7,7 @@ Handles both corpus formats:
 """
 
 import json
+import logging
 import re
 import sys
 from datetime import datetime
@@ -15,6 +16,7 @@ from google.cloud import storage, bigquery
 
 _gcs = storage.Client()
 _bq = bigquery.Client()
+LOGGER = logging.getLogger(__name__)
 
 # canonical name -> surface forms seen in the wild
 #test commut
@@ -152,8 +154,13 @@ def parse_msa_file(bucket_name, blob_name):
 
     distribution_date = find_distribution_date(text)
     if distribution_date is None:
-        print(f"WARN: no distribution date matched in {msa_id}: {subject_text[:60]!r}",
-              file=sys.stderr)
+        LOGGER.warning(
+            "No distribution date matched in MSA profile",
+            extra={
+                "event": "msa_distribution_date_missing",
+                "msa_id": msa_id,
+            },
+        )
 
     # --- action / deadline: read the real fields, don't guess ---
     requires_action = get_field(text, "Does this message require customers to take action?")
@@ -211,11 +218,24 @@ BQ_TABLE = "sprinternship-bld-2026.msa_manager.msa_updates"
 def write_profile(profile):
     # always write -- an unmatched MSA must be visible, not silently dropped
     if not profile["affected_services"]:
-        print(f"WARN: no service matched in {profile['msa_id']}: "
-              f"{profile['headline'][:60]!r}", file=sys.stderr)
+        LOGGER.warning(
+            "No service matched in MSA profile",
+            extra={
+                "event": "msa_service_match_missing",
+                "msa_id": profile["msa_id"],
+            },
+        )
     errors = _bq.insert_rows_json(BQ_TABLE, [profile])
     if errors:
-        print(f"ERROR: failed to write {profile['msa_id']} to BigQuery: {errors}", file=sys.stderr)
+        LOGGER.error(
+            "Failed to write MSA profile to BigQuery",
+            extra={
+                "event": "msa_profile_write_failed",
+                "msa_id": profile["msa_id"],
+                "error_count": len(errors),
+                "errors": errors,
+            },
+        )
     return errors
 
 
