@@ -1,3 +1,4 @@
 -r services/web/requirements.txt
 -r services/john/requirements.txt
 -r scripts/requirements.txt
+bcrypt==5.0.0
