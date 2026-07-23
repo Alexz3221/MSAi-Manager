@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MSAi Manager</title>
+  <link rel="preconnect"  href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main>
+    <header class="app-header">
+        <div class="brand">
+            <img src="/static/logo.svg" alt="MSAi Manager logo" class="logo">
+            <div>
+              <span class="eyebrow">Google Cloud MSA Workspace</span>
+              <h1>MSAi Manager</h1>
+              <p class="subtitle">One place to review service notices and ask John what matters.</p>
+            </div>
+          </div>
+      <nav class="tool-nav" aria-label="Tools">
+        <button class="tool-tab active" type="button" data-tool-target="feed-tool" aria-selected="true">Feed</button>
+        <button class="tool-tab" id="john-tab" type="button" data-tool-target="john-tool" aria-selected="false">John</button>
+      </nav>
+    </header>
+
+    <section class="tool-view" id="feed-tool">
+      <div class="layout">
+      <aside class="panel">
+        <h2>MSA Feed</h2>
+        <p class="subtitle">Browse all MSA notices and filter by company, service, timing, and whether action is required.</p>
+        <form id="filters">
+          <label for="company">Company</label>
+          <select id="company" name="company"></select>
+
+          <label for="service">Service</label>
+          <select id="service" name="service"></select>
+
+          <div class="date-grid">
+            <div>
+              <label for="effective_from">From</label>
+              <input id="effective_from" name="effective_from" type="date">
+            </div>
+            <div>
+              <label for="effective_to">To</label>
+              <input id="effective_to" name="effective_to" type="date">
+            </div>
+          </div>
+
+          <label class="toggle">
+            <input id="requires_action" name="requires_action" type="checkbox">
+            Requires customer action
+          </label>
+
+          <button type="submit">Apply filters</button>
+        </form>
+      </aside>
+
+      <section>
+        <div class="topline">
+          <div class="stat"><strong id="notice-count">0</strong><span>Matching MSAs</span></div>
+          <div class="stat"><strong id="company-count">0</strong><span>Impacted companies</span></div>
+          <div class="stat"><strong id="action-count">0</strong><span>Action required</span></div>
+        </div>
+        <div class="feed" id="feed"></div>
+      </section>
+      </div>
+    </section>
+
+    <section class="tool-view" id="john-tool" hidden>
+      <div class="john-shell">
+        <header class="john-heading">
+          <span class="eyebrow">Conversational advisor</span>
+          <h2>Ask John</h2>
+          <p class="subtitle">John checks the scoped project and MSA demo data, then uses Gemini on Vertex AI to explain the result.</p>
+        </header>
+        <div class="chat-log" id="chat-log" aria-live="polite">
+          <article class="message john">
+            <span class="message-label">John</span>
+            Hi. Ask me which MSA notices affect your projects, what deadline comes first, or about a specific Google Cloud product.
+          </article>
+        </div>
+        <div class="suggestions">
+          <button class="suggestion" type="button" data-prompt="Which MSA notices affect my projects?">What affects my projects?</button>
+          <button class="suggestion" type="button" data-prompt="Which deadline comes first, and what should I do?">Show my next deadline</button>
+        </div>
+        <form class="john-form" id="john-form">
+          <textarea id="john-message" maxlength="4000" placeholder="Ask John about notices, deadlines, migrations, or a Google Cloud product..." required></textarea>
+          <button id="john-send" type="submit">Send</button>
+        </form>
+        <p class="john-status" id="john-status">Conversation history is temporary and can reset when Cloud Run restarts.</p>
+      </div>
+    </section>
+  </main>
+<script>window.JOHN_ENABLED = __JOHN_ENABLED__;</script>
+<script src="/static/john.js" ></script>
+</body>
+</html>
