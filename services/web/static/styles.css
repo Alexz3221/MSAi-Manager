@@ -6,6 +6,7 @@
       --yellow: #FBBC05;
       --green: #34A853;
       --red: #EA4335;
+      --grey: #D9D9D9;
       --card-bg: #ececec;
       --font-main: "Google Sans Flex", Roboto, Arial, sans-serif;
     }
@@ -58,26 +59,31 @@
     .tool-nav {
       background: transparent;
       border: 0;
-      border-radius: 9px;
-      display: grid;
-      gap: 5px;
-      grid-template-columns: repeat(2, minmax(110px, 1fr));
-      padding: 5px;
+      display: flex;
+      gap: 24px;
+      padding: 0;
     }
 
     .tool-tab {
       background: transparent;
+      border: 0;
+      border-bottom: 3px solid transparent;
+      border-radius:0;
       color: var(--black);
+      font-weight: 700;
       margin: 0;
-      min-height: 40px;
+      min-height: auto;
       width: auto;
+      padding: 4px 2px 10px
     }
 
-    .tool-tab:hover { background: var(--card-bg); }
+    .tool-tab:hover { background: transparent;
+    opacity: 0.7; }
 
     .tool-tab.active {
-      background: var(--blue);
-      color: var(--white);
+      background: transparent;
+      border-bottom-color: var(--red);
+      color: var(--black);
     }
 
     .tool-tab:disabled {
@@ -89,7 +95,7 @@
 
     .layout {
       display: grid;
-      grid-template-columns: 310px 1fr;
+      grid-template-columns: 260px minmax(0,1fr) 280px;
       gap: 18px;
       align-items: start;
     }
@@ -104,8 +110,13 @@
       top: 20px;
     }
 
-    .feed-card,
-    .stat{
+    .panel h2 {
+      
+      margin: 0 0 12px;
+      font-weight: 500
+    }
+
+    .feed-card{
       background: var(--card-bg);
       border: 0;
       border-radius: 8px;
@@ -155,13 +166,47 @@
     .toggle {
       align-items: center;
       display: flex;
-      gap: 9px;
-      margin-top: 14px;
+      gap: 10px;
+      margin: 14px 0 7px;
+      cursor: pointer;
+      font-weight: 400;
     }
-
+    
     .toggle input {
+      appearance: none;
+      -webkit-appearance: none;
+      position: relative;
+      width: 40px;
+      height: 22px;
       min-height: auto;
-      width: auto;
+      border-radius: 999px;
+      background: var(--card-bg);
+      border: 1px solid rgba(0,0,0,0.15);
+      cursor: pointer;
+      transition: background 0.2s ease;
+      flex-shrink: 0;
+    }
+    
+    .toggle input::before {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--white);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+      transition: transform 0.2s ease;
+    }
+    
+    .toggle input:checked {
+      background: var(--blue);
+      border-color: var(--blue);
+    }
+    
+    .toggle input:checked::before {
+      transform: translateX(18px);
     }
 
     button {
@@ -180,28 +225,9 @@
 
     button:hover { filter: brightness(0.88); }
 
-    .topline {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin-bottom: 14px;
-    }
+  
 
-    .stat {
-      padding: 14px;
-    }
 
-    .stat strong {
-      display: block;
-      font-size: 22px;
-      line-height: 1;
-    }
-
-    .stat span {
-      color: var(--black);
-      font: 700 11px/1 var(--font-main);
-      text-transform: uppercase;
-    }
 
     .feed {
       display: grid;
@@ -209,7 +235,130 @@
     }
 
     .feed-card {
-      padding: 22px;
+      padding: 14px 16px;
+      border-left: 4px solid var(--blue);
+    }
+
+    .feed-card.status-required { border-left-color: var(--red); }
+    .feed-card.status-advised  { border-left-color: var(--yellow); }
+    .feed-card.status-default  { border-left-color: var(--blue); }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+      vertical-align: middle;
+      background: var(--blue);
+    }
+
+    .status-required .status-dot { background: var(--red); }
+    .status-advised  .status-dot { background: var(--yellow); }
+
+    .feed-card h2 {
+      font-size: 17px;
+      margin: 0 0 8px;
+    }
+    
+    .feed-card p {
+      font-size: 13px;
+      margin: 6px 0;
+    }
+    
+    .feed-card .pills {
+      margin: 8px 0;
+      gap: 6px;
+    }
+    
+    .feed-card .pill {
+      font-size: 11px;
+      padding: 5px 8px;
+    }
+
+
+
+    .stats-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    
+    .ring-card {
+      background: transparent;
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      padding: 24px 0;
+    }
+    
+    .ring-wrap {
+      position: relative;
+      width: 160px;
+      height: 160px;
+    }
+    
+    .ring {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+    
+    .ring-track {
+      fill: none;
+      stroke: var(--grey);
+      stroke-width: 10;
+    }
+    
+    .ring-progress {
+      fill: none;
+      stroke: var(--red);
+      stroke-width: 10;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.4s ease;
+    }
+    
+    .ring-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    
+    .ring-center strong {
+      font-size: 34px;
+      line-height: 1;
+    }
+    
+    .ring-center span {
+      font-size: 13px;
+      margin-top: 6px;
+    }
+    
+    .mini-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: transparent;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .mini-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--grey);
+      font-size: 15px;
+    }
+    
+    .mini-table tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .mini-table td:last-child {
+      text-align: right;
+      font-weight: 700;
     }
 
     .meta {
@@ -395,8 +544,8 @@
           flex-direction: column;
         }
        
-        .layout,
-        .topline {
+        .layout
+       {
           grid-template-columns: 1fr;
         }
        

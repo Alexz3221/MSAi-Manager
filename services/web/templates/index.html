@@ -29,9 +29,15 @@
     <section class="tool-view" id="feed-tool">
       <div class="layout">
       <aside class="panel">
-        <h2>MSA Feed</h2>
-        <p class="subtitle">Browse all MSA notices and filter by company, service, timing, and whether action is required.</p>
+        <h2>Filters</h2>
         <form id="filters">
+
+          <label class="toggle">
+                Requires customer action
+                <input id="requires_action" name="requires_action" type="checkbox">
+                
+          </label>
+
           <label for="company">Company</label>
           <select id="company" name="company"></select>
 
@@ -49,23 +55,34 @@
             </div>
           </div>
 
-          <label class="toggle">
-            <input id="requires_action" name="requires_action" type="checkbox">
-            Requires customer action
-          </label>
-
           <button type="submit">Apply filters</button>
         </form>
       </aside>
 
       <section>
-        <div class="topline">
-          <div class="stat"><strong id="notice-count">0</strong><span>Matching MSAs</span></div>
-          <div class="stat"><strong id="company-count">0</strong><span>Impacted companies</span></div>
-          <div class="stat"><strong id="action-count">0</strong><span>Action required</span></div>
-        </div>
         <div class="feed" id="feed"></div>
       </section>
+      <aside class="panel stats-panel">
+        <div class="ring-card">
+          <div class="ring-wrap">
+            <svg class="ring" viewBox="0 0 140 140">
+              <circle class="ring-track" cx="70" cy="70" r="60"></circle>
+              <circle class="ring-progress" id="ring-progress" cx="70" cy="70" r="60"></circle>
+            </svg>
+            <div class="ring-center">
+              <strong id="action-count">0</strong>
+              <span>of <span id="notice-count">0</span> need action</span>
+            </div>
+          </div>
+        </div>
+      
+        <table class="mini-table">
+          <tbody>
+            <tr><td>MSA Matches</td><td id="notice-count-table">0</td></tr>
+            <tr><td>Companies</td><td id="company-count">0</td></tr>
+          </tbody>
+        </table>
+      </aside>
       </div>
     </section>
 

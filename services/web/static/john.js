@@ -138,6 +138,15 @@
       return params;
     }
 
+    function statusFromSubject(subject) {
+        const match = /^\s*\[(action required|action advised)\]/i.exec(subject || "");
+        if (!match) return "status-default";
+        const tag = match[1].toLowerCase();
+        if (tag === "action required") return "status-required";
+        if (tag === "action advised") return "status-advised";
+        return "status-default";
+      }
+
     function renderFeed(payload) {
       const impacted = new Set();
       let actionRequired = 0;
@@ -150,6 +159,14 @@
       noticeCount.textContent = payload.count;
       companyCount.textContent = impacted.size;
       actionCount.textContent = actionRequired;
+      document.querySelector("#notice-count-table").textContent = payload.count;
+
+      const radius = 60;
+      const circumference = 2 * Math.PI * radius;
+      const percent = payload.count ? actionRequired / payload.count : 0;
+      const ringProgress = document.querySelector("#ring-progress");
+      ringProgress.style.strokeDasharray = `${circumference} ${circumference}`;
+      ringProgress.style.strokeDashoffset = `${circumference * (1 - percent)}`;
 
       if (!payload.items.length) {
         feed.innerHTML = `<article class="feed-card">No MSA notices match the selected filters.</article>`;
@@ -161,26 +178,22 @@
           .map(service => `<span class="pill">${escapeHtml(service)}</span>`)
           .join("");
         const companies = item.impacted_companies
-          .map(company => {
-            const matched = company.matching_services.join(", ");
-            return `<span class="pill warning">${escapeHtml(company.company_name)}: ${escapeHtml(matched)}</span>`;
+          .map(company => {return `<span class="pill warning">${escapeHtml(company.company_name)}</span>`;
           })
           .join("");
         const actions = item.actions
           .map(action => `<li>${escapeHtml(action)}</li>`)
           .join("");
 
+        const statusClass = statusFromSubject(item.subject);
+
         return `
-          <article class="feed-card">
-            <div class="meta">${escapeHtml(item.date)} | ${escapeHtml(item.msa_id)}</div>
-            <h2>${escapeHtml(item.subject)}</h2>
+          <article class="feed-card ${statusClass}">
+            <h2><span class = "status-dot"></span> ${escapeHtml(item.subject)}</h2>
+            <p><strong>effective:</strong> ${escapeHtml(item.effective_date || "Not listed")}</p>
             <div class="pills">${services}</div>
-            <p><strong>Effective date:</strong> ${escapeHtml(item.effective_date || "Not listed")}</p>
-            <p><strong>Customer action required:</strong> ${item.requires_customer_action ? "Yes" : "No"}</p>
-            <p>${escapeHtml(item.summary)}</p>
             <div class="pills">${companies}</div>
             ${actions ? `<ul>${actions}</ul>` : ""}
-            <p class="path">${escapeHtml(item.raw_msa_path)}</p>
           </article>
         `;
       }).join("");
