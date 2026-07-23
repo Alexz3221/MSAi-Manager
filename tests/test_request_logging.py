@@ -192,8 +192,9 @@ class RequestLoggingTests(unittest.TestCase):
         with patch.object(app, "JOHN_ENABLED", False):
             page = app.html_page()
 
-        self.assertIn("const johnEnabled = false;", page)
-        self.assertIn('johnTab.textContent = "John (offline)";', page)
+        self.assertIn("window.JOHN_ENABLED = false;", page)
+        john_js = (app.STATIC_DIR / "john.js").read_text(encoding = "utf-8")
+        self.assertIn('johnTab.textContent = "John (offline)";', john_js)
 
     def test_json_log_formatter_outputs_cloud_logging_fields(self) -> None:
         record = logging.makeLogRecord(
