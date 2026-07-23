@@ -196,7 +196,8 @@ Answering:
   notices. Stop there.
 - If found=true with an empty notices list, say plainly that no current notices
   match that customer.
-- Cite msa_id for every claim, and name the matching_services that caused each match.
+- DO NOT include, list, or mention internal MSA IDs (e.g., do not output msa_01_..., MSA_AccountTeam_..., etc.). 
+  Focus solely on notice title, effective date, service, and details.
 - Lead with the soonest effective_date.
 - A match is inferred from service-name overlap, not confirmed resource usage. Say
   "this may affect you because you use X", not "you must migrate X".

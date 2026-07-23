@@ -57,9 +57,7 @@
     function appendMessage(role, text, tools = []) {
       const article = document.createElement("article");
       article.className = `message ${role}`;
-      const toolNote = tools.length
-        ? `<span class="tool-note">Used: ${escapeHtml(tools.join(", "))}</span>`
-        : "";
+      const toolNote = "";
       const formattedText = escapeHtml(text)
         .replace(/`([^`]+)`/g, "<code>$1</code>")
         .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
