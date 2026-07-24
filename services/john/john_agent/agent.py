@@ -28,6 +28,10 @@ USER_ID = os.environ.get("JOHN_USER_ID", "088")
 ROLE_INTERNAL = "internal"
 ROLE_CUSTOMER = "customer"
 
+def _role(tool_context) -> str:
+    r = tool_context.state.get("role", ROLE_CUSTOMER)
+    print(f"[DEBUG _role] state={dict(tool_context.state)} -> role={r}")
+    return r
 
 class ToolContextLike(Protocol):
     state: dict[str, Any]
