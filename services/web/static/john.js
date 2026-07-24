@@ -145,6 +145,14 @@
         return "status-default";
       }
 
+    function formatSubject(subject) {
+        const match = /^\s*\[([^\]]+)\]\s*/.exec(subject || "");
+        if (!match) return escapeHtml(subject || "");
+        const tag = match[1].toUpperCase();
+        const rest = (subject || "").slice(match[0].length);
+        return `<span class="status-tag">${escapeHtml(tag)}:</span> ${escapeHtml(rest)}`;
+      }
+
     function renderFeed(payload) {
       const impacted = new Set();
       let actionRequired = 0;
@@ -187,7 +195,7 @@
 
         return `
           <article class="feed-card ${statusClass}">
-            <h2><span class = "status-dot"></span> ${escapeHtml(item.subject)}</h2>
+            <h2><span class="status-dot"></span>${formatSubject(item.subject)}</h2>
             <p><strong>effective:</strong> ${escapeHtml(item.effective_date || "Not listed")}</p>
             <div class="pills">${services}</div>
             <div class="pills">${companies}</div>

@@ -37,17 +37,22 @@ class ToolContextLike(Protocol):
     state: dict[str, Any]
 
 
+def _state(tool_context: ToolContextLike) -> dict[str, Any]:
+    state = getattr(tool_context, "state", None)
+    return state if isinstance(state, dict) else {}
+
+
 def _principal_from_context(tool_context: ToolContextLike) -> str | None:
-    return tool_context.state.get("principal_email")
+    return _state(tool_context).get("principal_email")
 
 
 def _role(tool_context: ToolContextLike) -> str:
     # Default to least privilege: an unset role is treated as a customer.
-    return tool_context.state.get("role", ROLE_CUSTOMER)
+    return _state(tool_context).get("role", ROLE_CUSTOMER)
 
 
 def _session_company(tool_context: ToolContextLike) -> str | None:
-    return tool_context.state.get("company_id")
+    return _state(tool_context).get("company_id")
 
 
 def _stringify(value):

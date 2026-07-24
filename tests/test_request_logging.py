@@ -14,6 +14,7 @@ from services.web.rate_limit import RateLimitDecision
 
 class RequestLoggingTests(unittest.TestCase):
     def setUp(self) -> None:
+        app.sessions.SESSIONS.clear()
         self.server = app.ThreadingHTTPServer(("127.0.0.1", 0), app.RequestHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -23,6 +24,17 @@ class RequestLoggingTests(unittest.TestCase):
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=5)
+        app.sessions.SESSIONS.clear()
+
+    def auth_cookie(
+        self,
+        *,
+        email: str = "internal@google.com",
+        role: str = "internal",
+        company_id: str | None = None,
+    ) -> str:
+        signed = app.sessions.create_session(email, role, company_id)
+        return f"{app.sessions.COOKIE_NAME}={signed}"
 
     def test_get_exception_is_logged_and_returns_generic_503(self) -> None:
         with (
@@ -33,7 +45,10 @@ class RequestLoggingTests(unittest.TestCase):
                 urlopen(
                     Request(
                         f"{self.base_url}/api/companies",
-                        headers={"X-Cloud-Trace-Context": "test-get-trace"},
+                        headers={
+                            "Cookie": self.auth_cookie(),
+                            "X-Cloud-Trace-Context": "test-get-trace",
+                        },
                     ),
                     timeout=5,
                 )
@@ -81,6 +96,11 @@ class RequestLoggingTests(unittest.TestCase):
                 }
             ).encode(),
             headers={
+                "Cookie": self.auth_cookie(
+                    email="customer@example.com",
+                    role="customer",
+                    company_id="demo_customer",
+                ),
                 "Content-Type": "application/json",
                 "X-Forwarded-For": "203.0.113.10, 10.0.0.1",
             },
@@ -109,13 +129,19 @@ class RequestLoggingTests(unittest.TestCase):
             message="What affects me?",
             user_id="browser-user",
             session_id="existing-session",
+            role="customer",
+            company_id="demo_customer",
+            principal_email="customer@example.com",
         )
 
     def test_john_endpoint_rejects_an_empty_message(self) -> None:
         request = Request(
             f"{self.base_url}/api/john",
             data=b'{"message":""}',
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Cookie": self.auth_cookie(),
+                "Content-Type": "application/json",
+            },
             method="POST",
         )
 
@@ -132,7 +158,10 @@ class RequestLoggingTests(unittest.TestCase):
         request = Request(
             f"{self.base_url}/api/john",
             data=b'{"message":"Hello"}',
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Cookie": self.auth_cookie(),
+                "Content-Type": "application/json",
+            },
             method="POST",
         )
         decision = RateLimitDecision(
