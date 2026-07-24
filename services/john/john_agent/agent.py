@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 from google.adk.agents import Agent
 
 from msai_core import matching
-from . import query
 
 
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
@@ -296,7 +295,7 @@ if __name__ == "__main__":
     import sys
     role = sys.argv[1] if len(sys.argv) > 1 else ROLE_INTERNAL
     company = sys.argv[2] if len(sys.argv) > 2 else None
-    asyncocie.run(agent_main(role=role, company_id=company))
+    asyncio.run(agent_main(role=role, company_id=company))
 
 
 __all__ = [

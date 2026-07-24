@@ -127,7 +127,7 @@ class RequestLoggingTests(unittest.TestCase):
         rate_limit.assert_called_once_with("203.0.113.10")
         chat.assert_called_once_with(
             message="What affects me?",
-            user_id="browser-user",
+            user_id="customer@example.com",
             session_id="existing-session",
             role="customer",
             company_id="demo_customer",
