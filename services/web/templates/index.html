@@ -24,6 +24,8 @@
         <button class="tool-tab active" type="button" data-tool-target="feed-tool" aria-selected="true">Feed</button>
         <button class="tool-tab" id="john-tab" type="button" data-tool-target="john-tool" aria-selected="false">John</button>
       </nav>
+
+      <button onclick="logout()">Log out</button>
     </header>
 
     <section class="tool-view" id="feed-tool">
@@ -111,6 +113,14 @@
       </div>
     </section>
   </main>
+
+<script>
+function logout() {
+  fetch('/api/logout', { method: 'POST' })
+    .then(() => location.href = '/login');
+}
+</script>
+
 <script>window.JOHN_ENABLED = __JOHN_ENABLED__;</script>
 <script src="/static/john.js" ></script>
 </body>
