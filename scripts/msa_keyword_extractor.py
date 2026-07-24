@@ -22,6 +22,7 @@ LOGGER = logging.getLogger(__name__)
 #test commut
 SERVICE_ALIASES = {
     "apigee":                   ["apigee", "apigee hybrid", "apigee x", "apigee edge"],
+    "app engine":               ["app engine", "appengine"],
     "artifact registry":        ["artifact registry"],
     "bigquery":                 ["bigquery", "big query"],
     "bigtable":                 ["bigtable", "cloud bigtable"],
