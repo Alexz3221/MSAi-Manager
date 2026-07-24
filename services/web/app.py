@@ -19,6 +19,7 @@ from msai_core.matching import (
 from services.john.john_agent.runtime import JohnRuntime
 from services.web.rate_limit import JohnRateLimiter
 from services.web import users, sessions
+
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 users.init_db()
 HOST = "0.0.0.0"
@@ -34,6 +35,7 @@ WEB_DIR = Path(__file__).resolve().parent
 TEMPLATE_PATH = WEB_DIR / "templates" / "index.html"
 LOGIN_TEMPLATE_PATH = WEB_DIR / "templates" / "login.html"
 STATIC_DIR = WEB_DIR / "static"
+
 # Paths reachable WITHOUT a logged-in session.
 #  - /login, /api/login, /api/register: the auth flow itself
 #  - /health: liveness probe
@@ -45,6 +47,7 @@ RESERVED_LOG_RECORD_FIELDS = set(logging.makeLogRecord({}).__dict__) | {
     "message",
     "asctime",
 }
+
 class JsonLogFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload: dict[str, object] = {
@@ -70,6 +73,7 @@ class JsonLogFormatter(logging.Formatter):
             payload["exception_message"] = str(exception_value)
             payload["stack_trace"] = "".join(traceback.format_exception(*record.exc_info))
         return json.dumps(payload, default=str, separators=(",", ":"))
+
 def configure_logging() -> None:
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonLogFormatter())
@@ -78,11 +82,13 @@ def configure_logging() -> None:
         handlers=[handler],
         force=True,
     )
+
 configure_logging()
 LOGGER = logging.getLogger(__name__)
 JOHN_RUNTIME = JohnRuntime()
 MAX_JOHN_MESSAGE_LENGTH = 4_000
 CUSTOMER_DATA_BUCKET = os.environ.get("CUSTOMER_DATA_BUCKET", "dummy_client_bucket")
+
 def cloud_trace_fields(trace_header: str | None) -> dict[str, str]:
     if not trace_header:
         return {"trace": "unavailable"}
@@ -95,6 +101,7 @@ def cloud_trace_fields(trace_header: str | None) -> dict[str, str]:
             f"projects/{PROJECT_ID}/traces/{trace_id}"
         )
     return fields
+
 def bool_setting(name: str, default: bool) -> bool:
     value = os.environ.get(name, str(default)).strip().casefold()
     if value in {"1", "true", "yes", "y", "on"}:
@@ -102,6 +109,7 @@ def bool_setting(name: str, default: bool) -> bool:
     if value in {"0", "false", "no", "n", "off"}:
         return False
     raise RuntimeError(f"{name} must be true or false.")
+
 def positive_int_setting(name: str, default: int) -> int:
     try:
         value = int(os.environ.get(name, default))
@@ -110,6 +118,7 @@ def positive_int_setting(name: str, default: int) -> int:
     if value <= 0:
         raise RuntimeError(f"{name} must be a positive integer.")
     return value
+
 JOHN_ENABLED = bool_setting("JOHN_ENABLED", True)
 JOHN_RATE_LIMITER = JohnRateLimiter(
     per_client_limit=positive_int_setting("JOHN_RATE_LIMIT_PER_CLIENT", 25),
@@ -123,10 +132,12 @@ JOHN_RATE_LIMITER = JohnRateLimiter(
         3_600,
     ),
 )
+
 def bool_param(value: str | None) -> bool | None:
     if value is None or value == "":
         return None
     return value.casefold() in {"1", "true", "yes", "y"}
+
 def feed_item_payload(item) -> dict[str, object]:
     return {
         "msa_id": item.msa_id,
@@ -148,9 +159,8 @@ def feed_item_payload(item) -> dict[str, object]:
         "actions": item.actions,
         "raw_msa_path": str(item.raw_msa_path),
     }
+
 def feed_payload(query: dict[str, list[str]], force_company: str | None = None) -> dict[str, object]:
-    # force_company: when set (a customer session), the feed is locked to this
-    # company regardless of any 'company' query param the client sends.
     if force_company is not None:
         company = force_company
     else:
@@ -177,8 +187,8 @@ def feed_payload(query: dict[str, list[str]], force_company: str | None = None) 
         "count": len(feed),
         "items": [feed_item_payload(item) for item in feed],
     }
+
 def companies_payload(role: str = "internal") -> dict[str, object]:
-    # Customers may not enumerate other companies.
     if role != "internal":
         return {"companies": []}
     return {
@@ -187,6 +197,7 @@ def companies_payload(role: str = "internal") -> dict[str, object]:
             for profile in load_customer_profiles().values()
         ]
     }
+
 def services_payload() -> dict[str, object]:
     services = set()
     for profile in load_customer_profiles().values():
@@ -194,11 +205,14 @@ def services_payload() -> dict[str, object]:
     for profile in load_msa_profiles().values():
         services.update(profile.affected_services)
     return {"services": sorted(services)}
+
 def html_page() -> str:
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     return template.replace("__JOHN_ENABLED__", json.dumps(JOHN_ENABLED))
+
 def login_page() -> str:
     return LOGIN_TEMPLATE_PATH.read_text(encoding="utf-8")
+
 class RequestHandler(BaseHTTPRequestHandler):
     def log_context(self, method: str) -> dict[str, object]:
         parsed_url = urlparse(self.path)
@@ -208,14 +222,16 @@ class RequestHandler(BaseHTTPRequestHandler):
             "event": "request_error",
             **cloud_trace_fields(self.headers.get("X-Cloud-Trace-Context")),
         }
+
     def log_exception(self, method: str) -> None:
         LOGGER.exception(
             "Unhandled request error",
             extra=self.log_context(method),
         )
-    # ---- auth helpers -------------------------------------------------------
+
     def session(self) -> dict | None:
         return sessions.session_from_cookie(self.headers.get("Cookie"))
+
     def read_json_body(self, max_bytes: int = 16_384) -> dict | None:
         length = int(self.headers.get("Content-Length", 0))
         if length <= 0 or length > max_bytes:
@@ -225,7 +241,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         except (ValueError, json.JSONDecodeError):
             return None
         return data if isinstance(data, dict) else None
-    # ---- response helpers ---------------------------------------------------
+
     def send_json(
         self,
         status: int,
@@ -240,6 +256,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.send_header(name, value)
         self.end_headers()
         self.wfile.write(body)
+
     def client_key(self) -> str:
         forwarded_for = self.headers.get("X-Forwarded-For", "")
         if forwarded_for:
@@ -247,6 +264,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             if forwarded_client:
                 return forwarded_client
         return str(self.client_address[0])
+
     def send_html(self, html: str) -> None:
         body = html.encode("utf-8")
         self.send_response(200)
@@ -254,12 +272,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
     def redirect(self, location: str) -> None:
         self.send_response(302)
         self.send_header("Location", location)
         self.end_headers()
+
     def serve_static(self, url_path: str) -> bool:
-        """Serve a file from STATIC_DIR if url_path is under /static/. Returns True if handled."""
         if not url_path.startswith("/static/"):
             return False
         relative = url_path.removeprefix("/static/")
@@ -279,26 +298,25 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
         return True
+
     def do_GET(self) -> None:
         try:
             self.handle_get()
         except Exception:
             self.log_exception("GET")
             self.send_json(503, {"error": "Service unavailable"})
+
     def handle_get(self) -> None:
         parsed_url = urlparse(self.path)
         query = parse_qs(parsed_url.query)
-        # Static assets are always allowed (login page needs its CSS/JS).
         if self.serve_static(parsed_url.path):
             return
-        # Login page is public.
         if parsed_url.path == "/login":
             self.send_html(login_page())
             return
         if parsed_url.path == "/health":
             self.send_json(200, {"status": "ok"})
             return
-        # Everything else requires a session.
         sess = self.session()
         if sess is None:
             self.redirect("/login")
@@ -315,7 +333,6 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.send_json(200, services_payload())
             return
         if parsed_url.path in {"/api/feed", "/api/company"}:
-            # Customers are locked to their own company; internal may filter freely.
             force = company_id if role == "customer" else None
             if role != "customer" and parsed_url.path == "/api/company" and "company" not in query:
                 name = query.get("name", [""])[0]
@@ -324,9 +341,9 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.send_json(200, feed_payload(query, force_company=force))
             return
         self.send_json(404, {"error": "Not found"})
+
     def do_POST(self) -> None:
         parsed_url = urlparse(self.path)
-        # --- public auth routes (no session required) ------------------------
         if parsed_url.path == "/api/register":
             body = self.read_json_body()
             if body is None:
@@ -362,6 +379,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             name, value = sessions.clear_cookie_header()
             self.send_json(200, {"ok": True}, headers={name: value})
             return
+
         # --- John: requires a session ---------------------------------------
         if parsed_url.path == "/api/john":
             if not JOHN_ENABLED:
@@ -378,9 +396,13 @@ class RequestHandler(BaseHTTPRequestHandler):
                 payload = json.loads(self.rfile.read(content_length))
                 if not isinstance(payload, dict):
                     raise ValueError("Request body must be a JSON object.")
+                
                 message = str(payload.get("message", "")).strip()
-                user_id = str(payload.get("user_id", "web-user")).strip()
+                
+                # FIX: Tie user_id strictly to the authenticated session email
+                user_id = str(sess.get("email") or "anonymous").strip()
                 session_id = str(payload.get("session_id", "")).strip() or None
+                
                 if not message:
                     raise ValueError("Message is required.")
                 if len(message) > MAX_JOHN_MESSAGE_LENGTH:
@@ -392,6 +414,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 if session_id and len(session_id) > 128:
                     raise ValueError("Session ID must be 128 characters or fewer.")
                 rate_limit = JOHN_RATE_LIMITER.check(self.client_key())
+                
                 if not rate_limit.allowed:
                     retry_after = str(rate_limit.retry_after_seconds)
                     LOGGER.warning(
@@ -412,9 +435,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                         headers={"Retry-After": retry_after},
                     )
                     return
-                # Role/company from the verified session drive John's access
-                # control. These are injected into John's session state, NOT
-                # taken from the model or the client payload.
+                
                 self.send_json(
                     200,
                     JOHN_RUNTIME.chat(
@@ -435,8 +456,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.log_exception("POST")
                 self.send_json(503, {"error": "John is temporarily unavailable."})
             return
+
         # --- Pub/Sub push webhook: GCS file ingestion -----------------------
-        # Called by Google Pub/Sub, NOT a browser. Must stay unauthenticated.
         if parsed_url.path != "/":
             self.send_json(404, {"error": "Not found"})
             return
@@ -488,8 +509,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         except Exception:
             self.log_exception("POST")
             self.send_json(500, {"error": "Failed to process Pub/Sub message"})
+
     def log_message(self, format: str, *args: object) -> None:
         return
+
 def main() -> None:
     server = ThreadingHTTPServer((HOST, PORT), RequestHandler)
     LOGGER.info(
@@ -497,5 +520,6 @@ def main() -> None:
         extra={"event": "server_started", "host": HOST, "port": PORT},
     )
     server.serve_forever()
+
 if __name__ == "__main__":
     main()

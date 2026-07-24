@@ -5,6 +5,7 @@ from collections.abc import Callable
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from typing import Any
 from .agent import create_agent_app
+
 class JohnRuntime:
     """Run John's async ADK app behind the synchronous web server."""
     def __init__(
@@ -21,17 +22,20 @@ class JohnRuntime:
         self._app: Any = None
         self._session_lock: asyncio.Lock | None = None
         self._sessions: set[tuple[str, str]] = set()
+
     def _start(self) -> None:
         with self._startup_lock:
             if self._thread is not None and self._thread.is_alive():
                 return
             self._ready.clear()
+
             def run_loop() -> None:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 self._loop = loop
                 self._ready.set()
                 loop.run_forever()
+
             self._thread = threading.Thread(
                 target=run_loop,
                 name="john-adk-runtime",
@@ -40,11 +44,13 @@ class JohnRuntime:
             self._thread.start()
         if not self._ready.wait(timeout=5):
             raise RuntimeError("John's async runtime did not start.")
+
     @staticmethod
     def _session_id(session: Any) -> str:
         if isinstance(session, dict):
             return str(session["id"])
         return str(session.id)
+
     async def _chat(
         self,
         message: str,
@@ -58,6 +64,7 @@ class JohnRuntime:
             self._app = self._app_factory()
         if self._session_lock is None:
             self._session_lock = asyncio.Lock()
+        
         requested_session = session_id
         async with self._session_lock:
             session_key = (user_id, requested_session or "")
@@ -77,12 +84,18 @@ class JohnRuntime:
                 )
                 session_id = self._session_id(session)
                 self._sessions.add((user_id, session_id))
+
+        # FIX: Explicitly inject the user's identity into the prompt text 
+        # so the LLM doesn't have to guess or rely on tool calls to know who it is.
+        system_prefix = f"[System Note: The logged-in user is {principal_email or 'Unknown'} (Role: {role}, Company ID: {company_id or 'None'})]\n\n"
+        injected_message = system_prefix + message
+
         text_parts: list[str] = []
         tools: list[str] = []
         async for event in self._app.async_stream_query(
             user_id=user_id,
             session_id=session_id,
-            message=message,
+            message=injected_message,
         ):
             for part in event.get("content", {}).get("parts", []):
                 function_call = part.get("function_call")
@@ -93,14 +106,17 @@ class JohnRuntime:
                 text = str(part.get("text", "")).strip()
                 if text:
                     text_parts.append(text)
+        
         reply = "\n\n".join(text_parts).strip()
         if not reply:
             reply = "John did not return a text response. Please try again."
+        
         return {
             "session_id": session_id,
             "reply": reply,
             "tools": tools,
         }
+
     def chat(
         self,
         message: str,
@@ -129,4 +145,5 @@ class JohnRuntime:
         except FutureTimeoutError as exc:
             future.cancel()
             raise TimeoutError("John's response timed out.") from exc
+
 __all__ = ["JohnRuntime"]

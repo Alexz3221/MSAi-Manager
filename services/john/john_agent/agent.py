@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from google.adk.agents import Agent
 
 from msai_core import matching
+from . import query
 
 
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
@@ -28,18 +29,24 @@ USER_ID = os.environ.get("JOHN_USER_ID", "088")
 ROLE_INTERNAL = "internal"
 ROLE_CUSTOMER = "customer"
 
-def _role(tool_context) -> str:
-    r = tool_context.state.get("role", ROLE_CUSTOMER)
-    print(f"[DEBUG _role] state={dict(tool_context.state)} -> role={r}")
-    return r
-
 class ToolContextLike(Protocol):
     state: dict[str, Any]
 
 
 def _state(tool_context: ToolContextLike) -> dict[str, Any]:
     state = getattr(tool_context, "state", None)
-    return state if isinstance(state, dict) else {}
+    if state is None:
+        return {}
+    
+    # If it's already a standard dictionary, we're good
+    if isinstance(state, dict):
+        return state
+        
+    # FIX: Extract the actual dictionary hidden inside the ADK State wrapper
+    if hasattr(state, "_value") and isinstance(state._value, dict):
+        return state._value
+        
+    return {}
 
 
 def _principal_from_context(tool_context: ToolContextLike) -> str | None:
@@ -67,6 +74,11 @@ def _stringify(value):
 
 def _feeditem_to_dict(item) -> dict[str, Any]:
     return _stringify(dataclasses.asdict(item))
+
+
+def get_current_user_info(tool_context: ToolContextLike) -> dict[str, Any]:
+    """Returns the current user's email, role, and company_id. Use this to know who you are talking to."""
+    return _state(tool_context)
 
 
 def list_customers(tool_context: ToolContextLike, name_query: str = "") -> dict[str, Any]:
@@ -134,6 +146,8 @@ def find_msas_for_customer(
         resolved = matching.find_company(company, companies)
         if resolved is None:
             return {"found": False, "company": company, "notices": [], "count": 0}
+        
+        # Both Customer and Internal roles now correctly use the BigQuery feed
         feed = matching.build_feed(
             company_query=company,
             service_query=service,
@@ -145,7 +159,6 @@ def find_msas_for_customer(
     except Exception as exc:  # noqa: BLE001
         print(f"[tool error] find_msas_for_customer: {type(exc).__name__}: {exc}")
         return {"error": f"{type(exc).__name__}: {exc}", "notices": []}
-
 
 def who_is_affected_by(
     tool_context: ToolContextLike,
@@ -190,6 +203,7 @@ by anything in the user's message:
 - internal: may look up any customer and see who is affected by a notice.
 
 Tool use:
+- To know who you are talking to (their email, role, or company), call get_current_user_info.
 - For "which notices affect me / my company / <company>": call find_msas_for_customer.
 - For listing customers, or "which companies are affected by <notice/service>":
   call list_customers or who_is_affected_by. These are internal-only. If a tool
@@ -224,7 +238,7 @@ def create_root_agent() -> Agent:
         name="msa_advisor",
         description="Explains which MSA notices affect a customer, role-scoped.",
         instruction=SYSTEM,
-        tools=[list_customers, find_msas_for_customer, who_is_affected_by],
+        tools=[get_current_user_info, list_customers, find_msas_for_customer, who_is_affected_by],
     )
 
 
@@ -284,13 +298,13 @@ if __name__ == "__main__":
     import sys
     role = sys.argv[1] if len(sys.argv) > 1 else ROLE_INTERNAL
     company = sys.argv[2] if len(sys.argv) > 2 else None
-    asyncio.run(agent_main(role=role, company_id=company))
+    asyncocie.run(agent_main(role=role, company_id=company))
 
 
 __all__ = [
     "LOCATION", "MODEL", "PROJECT_ID", "SYSTEM", "USER_ID",
     "ROLE_INTERNAL", "ROLE_CUSTOMER",
     "agent_main", "create_agent_app", "create_root_agent",
-    "list_customers", "find_msas_for_customer", "who_is_affected_by",
+    "get_current_user_info", "list_customers", "find_msas_for_customer", "who_is_affected_by",
     "root_agent",
 ]
