@@ -20,12 +20,15 @@
               <p class="subtitle">One place to review service notices and ask John what matters.</p>
             </div>
           </div>
+    <div class="header-controls">
+      <button class ="logout-btn" onclick="logout()">Log out</button>
       <nav class="tool-nav" aria-label="Tools">
         <button class="tool-tab active" type="button" data-tool-target="feed-tool" aria-selected="true">Feed</button>
         <button class="tool-tab" id="john-tab" type="button" data-tool-target="john-tool" aria-selected="false">John</button>
       </nav>
+    </div>
 
-      <button onclick="logout()">Log out</button>
+      
     </header>
 
     <section class="tool-view" id="feed-tool">

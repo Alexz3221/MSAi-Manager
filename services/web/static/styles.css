@@ -64,6 +64,30 @@
       padding: 0;
     }
 
+    .header-controls {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 16px;
+    }
+    
+    .logout-btn {
+      align-self: flex-end;
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      background: transparent;
+      border: 1px solid rgba(0,0,0,0.2);
+      border-radius: 10px;
+      cursor: pointer;
+      color: inherit;
+      opacity: 0.75;
+    }
+    
+    .logout-btn:hover {
+      opacity: 1;
+      background: rgba(0,0,0,0.05);
+    }
+
     .tool-tab {
       background: transparent;
       border: 0;
@@ -389,7 +413,7 @@
     .pill {
       background: var(--white);
       border: 0;
-      border-radius: 999px;
+      border-radius: 10px;
       color: var(--black);
       font: 700 12px/1 var(--font-main);
       font-weight: 400;
@@ -397,8 +421,9 @@
     }
 
     .pill.warning {
-      background: var(--red);
+      background: var(--blue);
       border: 0;
+      border-radius: 4px; 
       color: var(--white);
     }
 
