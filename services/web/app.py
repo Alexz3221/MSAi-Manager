@@ -177,7 +177,7 @@ def feed_payload(query: dict[str, list[str]], force_company: str | None = None) 
         "count": len(feed),
         "items": [feed_item_payload(item) for item in feed],
     }
-def companies_payload(role: str) -> dict[str, object]:
+def companies_payload(role: str = "internal") -> dict[str, object]:
     # Customers may not enumerate other companies.
     if role != "internal":
         return {"companies": []}
