@@ -25,6 +25,35 @@ sprinternship-bld-2026.msa_manager.msa_updates
 sprinternship-bld-2026.msa_dataset.msa_daily_queue
 ```
 
+## Data Pipeline
+
+Customer data follows this path:
+
+```text
+Cloud Scheduler (17:00 UTC)
+  -> msai-manager-pull-user-data Cloud Run Job
+  -> customer export in Cloud Storage
+  -> Pub/Sub notification
+  -> scripts.asset_checker
+  -> msa_manager.customer_profiles
+```
+
+MSA data follows this path:
+
+```text
+raw MSA text in Cloud Storage
+  -> Pub/Sub notification
+  -> scripts.msa_keyword_extractor
+  -> msa_manager.msa_updates
+```
+
+The browser feed and John both match `customer_profiles` directly against
+`msa_updates`. A BigQuery scheduled query applies the same service-name and
+alias matching to append due deliveries to the partitioned canonical table
+`msa_dataset.msa_daily_queue` at 17:30 UTC. Cloud Scheduler runs
+`msai-manager-combine-and-send` at 18:00 UTC, one hour after the customer pull
+and 30 minutes after the queue refresh.
+
 ## Repository Guide
 
 ```text

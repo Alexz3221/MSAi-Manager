@@ -16,6 +16,5 @@ RUN pip install --no-cache-dir -r services/web/requirements.txt \
     && pip install --no-cache-dir --no-deps .
 
 COPY . .
-RUN python -m scripts.seed_john_demo
 
 CMD ["python", "app.py"]
