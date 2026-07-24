@@ -421,7 +421,7 @@
     }
 
     .pill.warning {
-      background: var(--blue);
+      background: #6e6e6e; /*Test to see*/
       border: 0;
       border-radius: 4px; 
       color: var(--white);
