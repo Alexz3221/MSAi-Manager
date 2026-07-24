@@ -196,7 +196,7 @@
         return `
           <article class="feed-card ${statusClass}">
             <h2><span class="status-dot"></span>${formatSubject(item.subject)}</h2>
-            <p><strong>effective:</strong> ${escapeHtml(item.effective_date || "Not listed")}</p>
+            <p><strong>Effective:</strong> ${escapeHtml(item.effective_date || "Not listed")}</p>
             <div class="pills">${services}</div>
             <div class="pills">${companies}</div>
             ${actions ? `<ul>${actions}</ul>` : ""}
