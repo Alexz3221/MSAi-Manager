@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import unittest
 from datetime import date
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import msai_core
@@ -53,7 +54,7 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
             patch.object(bigquery, "load_customer_records", return_value=[]),
             patch.object(bigquery, "load_msa_records", return_value=[msa_record]),
         ):
-            self.assertEqual(app.companies_payload(), {"companies": []})
+            self.assertEqual(app.companies_payload("internal"), {"companies": []})
             self.assertEqual(app.services_payload(), {"services": ["bigquery"]})
             self.assertEqual(app.feed_payload({})["count"], 0)
             self.assertEqual(
@@ -289,7 +290,7 @@ class PackageBoundaryTests(unittest.TestCase):
             ) as build_feed,
         ):
             result = john.find_msas_for_customer(
-                object(),
+                SimpleNamespace(state={"role": john.ROLE_INTERNAL}),
                 "Demo Customer",
                 service="bigquery",
                 requires_action=True,

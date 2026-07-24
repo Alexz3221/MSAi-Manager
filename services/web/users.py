@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import datetime as dt
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,7 +22,7 @@ import bcrypt
 
 #DB_PATH = Path(os.environ.get("USERS_DB", Path(__file__).resolve().parent / "users.db"))
 
-DB_PATH = Path(os.environ.get("USERS_DB", "/tmp/users.db"))
+DB_PATH = Path(os.environ.get("USERS_DB", Path(tempfile.gettempdir()) / "users.db"))
 
 # Internal domains -> internal role. Server-side allowlist; never client-supplied.
 INTERNAL_DOMAINS = {
@@ -39,6 +40,7 @@ class User:
 
 
 def _conn() -> sqlite3.Connection:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
     return con
