@@ -31,22 +31,28 @@
       display: flex;
       gap: 28px;
       justify-content: space-between;
-      margin-bottom: 22px;
+      margin-bottom: 28px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--grey);
     }
 
     .app-header h1 { margin-bottom: 5px; }
+    .app-header .subtitle{ display: none; }
 
 
     .eyebrow {
       color: var(--black);
-      font: 800 15px/1 var(--font-main);
+      font: 800 12px/1 var(--font-main);
       letter-spacing: 0.06em;
-      font-weight: 400;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+      display: block;
     }
 
     .logo {
-        width: 55px;
-        height: 55px;
+        width: 48px;
+        height: 48px;
         display: block;
       }
     .brand {
@@ -65,9 +71,9 @@
 
     .header-controls {
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 16px;
+      flex-direction: row;
+      align-items: center;
+      gap: 24px;
     }
     
     .logout-btn {
