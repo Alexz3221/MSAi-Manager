@@ -22,7 +22,7 @@ Primary BigQuery tables:
 ```text
 sprinternship-bld-2026.msa_manager.customer_profiles
 sprinternship-bld-2026.msa_manager.msa_updates
-sprinternship-bld-2026.msa_dataset.msa_daily_queue
+sprinternship-bld-2026.msa_manager.msa_daily_queue
 ```
 
 ## Data Pipeline
@@ -48,11 +48,10 @@ raw MSA text in Cloud Storage
 ```
 
 The browser feed and John both match `customer_profiles` directly against
-`msa_updates`. A BigQuery scheduled query applies the same service-name and
-alias matching to append due deliveries to the partitioned canonical table
-`msa_dataset.msa_daily_queue` at 17:30 UTC. Cloud Scheduler runs
-`msai-manager-combine-and-send` at 18:00 UTC, one hour after the customer pull
-and 30 minutes after the queue refresh.
+`msa_updates`. The BigQuery scheduled query `msa_daily_queue_append` appends due
+deliveries from `msa_manager.v_msa_daily_queue` into
+`msa_manager.msa_daily_queue` at 00:00 UTC. Cloud Scheduler runs
+`msai-manager-combine-and-send` against that queue.
 
 ## Repository Guide
 
@@ -113,7 +112,7 @@ GOOGLE_CLOUD_PROJECT=sprinternship-bld-2026
 BQ_DATASET=msa_manager
 BQ_CUSTOMERS_TABLE=customer_profiles
 BQ_MSA_UPDATES_TABLE=msa_updates
-BQ_QUEUE_DATASET=msa_dataset
+BQ_QUEUE_DATASET=msa_manager
 BQ_DAILY_QUEUE_TABLE=msa_daily_queue
 MSA_DATA_BUCKET=
 CUSTOMER_DATA_BUCKET=

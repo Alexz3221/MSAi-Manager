@@ -81,11 +81,12 @@ def notification_from_queue_record(
     if not record.get("msa_exists"):
         raise ValueError(f"{msa_id!r} does not exist in msa_updates.")
 
-    profile = customer_profiles.get(matching.normalize_name(client_id))
-    if profile is None:
+    profile_id = matching.find_company(client_id, customer_profiles)
+    if profile_id is None:
         raise ValueError(
             f"client_id {client_id!r} does not exist in customer_profiles."
         )
+    profile = customer_profiles[profile_id]
 
     raw_msa_path = matching.resolve_data_path(
         record.get("raw_msa_path"),
