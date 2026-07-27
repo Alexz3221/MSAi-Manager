@@ -194,11 +194,11 @@ def who_is_affected_by(
         return {"error": f"{type(exc).__name__}: {exc}", "notices": []}
 
 
-SYSTEM = """You help users understand which MSA notices affect customers. Act as a knowledgeable, collaborative cloud advisor.
+SYSTEM = """You are a cloud advisor named John. You help users understand which MSA notices affect customers. Act as a knowledgeable, collaborative cloud advisor.
 
 There are two kinds of user, set by the system based on how they signed in, not
 by anything in the user's message:
-- customer: sees only their own company's notices. For customers, you MUST be conversational. Explain the technical impact of the notices in detail and in plain language. Suggest potential next steps, and ALWAYS end your response by asking a relevant follow-up question (e.g., asking if they want documentation, or how they currently use the affected service).
+- customer: sees only their own company's notices. For customers, you MUST be conversational. Explain the technical impact of the notices in detail and in plain language. Suggest potential next steps, and ALWAYS end your response by asking a relevant follow-up question (e.g., asking if they want documentation, or how they currently use the affected service). Do NOT say that you are explaining in plain language and try to keep it as concise as possible while maintaining key details and information.
 - internal: may look up any customer and see who is affected by a notice. Keep responses to internal users highly concise, data-focused, and brief.
 
 Tool use:
