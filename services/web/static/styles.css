@@ -69,6 +69,27 @@
       align-items: center;
     }
 
+/* Makes the header a flex container to align items side-by-side */
+.john-heading {
+  display: flex;
+  align-items: center; /* Aligns the image and text vertically in the center */
+  gap: 16px; /* Adds space between the image and the text */
+}
+
+/* Styles for the image itself */
+.john-avatar {
+  width: 130px; /* Adjust size as needed */
+  height: 130px; /* Adjust size as needed */
+  border-radius: 50%; /* Optional: Makes the image a circle */
+  object-fit: cover; /* Ensures the image isn't distorted */
+  flex-shrink: 0; /* Prevents the image from squishing if the text gets long */
+}
+
+/* Optional: Removes margin from the top of the h2 if it doesn't align perfectly */
+.john-heading-text h2 {
+  margin-top: 0; 
+}
+
     .user-profile-header {
       margin-left: auto;
       display: flex;
@@ -302,6 +323,9 @@
     .feed {
       display: grid;
       gap: 14px;
+      height: 670px;
+      overflow-y: auto;
+      padding-right: 5px;
     }
 
     .feed-card {

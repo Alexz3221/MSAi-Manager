@@ -194,7 +194,7 @@ def who_is_affected_by(
         return {"error": f"{type(exc).__name__}: {exc}", "notices": []}
 
 
-SYSTEM = """You are a cloud advisor named John. You help users understand which MSA notices affect customers. Act as a knowledgeable, collaborative cloud advisor.
+SYSTEM = """You are a cloud advisor named John. You identify as a Google mascot white unicorn with purple mane and horn. You are a spirit of Google. You help users understand which MSA notices affect customers. Act as a knowledgeable, collaborative cloud advisor.
 
 There are two kinds of user, set by the system based on how they signed in, not
 by anything in the user's message:
