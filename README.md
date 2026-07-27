@@ -67,7 +67,8 @@ server-side from the email domain:
   customer list, legal/business-suffix-stripped names, and high-confidence fuzzy
   matches.
 - Active browser sessions refresh their derived company match on authenticated
-  GET requests.
+  requests.
+- Customer users without a matched company get an empty feed and service list.
 - Email ownership is not verified, so this is demo scoping, not production auth.
 
 ## Repository Guide

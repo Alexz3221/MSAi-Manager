@@ -160,30 +160,43 @@ def feed_item_payload(item) -> dict[str, object]:
         "raw_msa_path": str(item.raw_msa_path),
     }
 
+def feed_filters(
+    query: dict[str, list[str]],
+    company: str | None,
+) -> dict[str, object]:
+    return {
+        "company": company,
+        "service": query.get("service", [""])[0].strip() or None,
+        "effective_from": query.get("effective_from", [""])[0].strip() or None,
+        "effective_to": query.get("effective_to", [""])[0].strip() or None,
+        "requires_action": bool_param(query.get("requires_action", [""])[0]),
+    }
+
+def empty_feed_payload(
+    query: dict[str, list[str]],
+    company: str | None = None,
+) -> dict[str, object]:
+    return {
+        "filters": feed_filters(query, company),
+        "count": 0,
+        "items": [],
+    }
+
 def feed_payload(query: dict[str, list[str]], force_company: str | None = None) -> dict[str, object]:
     if force_company is not None:
         company = force_company
     else:
         company = query.get("company", [""])[0].strip() or None
-    service = query.get("service", [""])[0].strip() or None
-    effective_from = query.get("effective_from", [""])[0].strip() or None
-    effective_to = query.get("effective_to", [""])[0].strip() or None
-    requires_action = bool_param(query.get("requires_action", [""])[0])
+    filters = feed_filters(query, company)
     feed = build_feed(
-        company_query=company,
-        service_query=service,
-        requires_action=requires_action,
-        effective_from=effective_from,
-        effective_to=effective_to,
+        company_query=filters["company"],
+        service_query=filters["service"],
+        requires_action=filters["requires_action"],
+        effective_from=filters["effective_from"],
+        effective_to=filters["effective_to"],
     )
     return {
-        "filters": {
-            "company": company,
-            "service": service,
-            "effective_from": effective_from,
-            "effective_to": effective_to,
-            "requires_action": requires_action,
-        },
+        "filters": filters,
         "count": len(feed),
         "items": [feed_item_payload(item) for item in feed],
     }
@@ -365,9 +378,15 @@ class RequestHandler(BaseHTTPRequestHandler):
             self.send_json(200, companies_payload(role))
             return
         if parsed_url.path == "/api/services":
+            if role == "customer" and not company_id:
+                self.send_json(200, {"services": []})
+                return
             self.send_json(200, services_payload())
             return
         if parsed_url.path in {"/api/feed", "/api/company"}:
+            if role == "customer" and not company_id:
+                self.send_json(200, empty_feed_payload(query))
+                return
             force = company_id if role == "customer" else None
             if role != "customer" and parsed_url.path == "/api/company" and "company" not in query:
                 name = query.get("name", [""])[0]
@@ -424,6 +443,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             if sess is None:
                 self.send_json(401, {"error": "Not authenticated."})
                 return
+            sess = refresh_session_scope(sess)
             try:
                 content_length = int(self.headers.get("Content-Length", 0))
                 if content_length <= 0 or content_length > 16_384:

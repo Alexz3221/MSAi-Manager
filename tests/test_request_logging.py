@@ -140,6 +140,62 @@ class RequestLoggingTests(unittest.TestCase):
         )
         resolve.assert_called_once_with("aefnoo@broadcam.com")
 
+    def test_unmatched_customer_feed_is_empty_and_unscoped(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/feed?company=broadcom&service=bigquery",
+            headers={
+                "Cookie": self.auth_cookie(
+                    email="unmatched@example.invalid",
+                    role="customer",
+                    company_id=None,
+                )
+            },
+        )
+
+        with (
+            patch.object(
+                app.users,
+                "resolve_role_company",
+                return_value=("customer", None),
+            ),
+            patch.object(app, "build_feed") as build_feed,
+        ):
+            response = urlopen(request, timeout=5)
+
+        self.assertEqual(response.status, 200)
+        payload = json.loads(response.read())
+        self.assertEqual(payload["count"], 0)
+        self.assertEqual(payload["items"], [])
+        self.assertIsNone(payload["filters"]["company"])
+        self.assertEqual(payload["filters"]["service"], "bigquery")
+        build_feed.assert_not_called()
+
+    def test_unmatched_customer_services_are_empty(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/services",
+            headers={
+                "Cookie": self.auth_cookie(
+                    email="unmatched@example.invalid",
+                    role="customer",
+                    company_id=None,
+                )
+            },
+        )
+
+        with (
+            patch.object(
+                app.users,
+                "resolve_role_company",
+                return_value=("customer", None),
+            ),
+            patch.object(app, "services_payload") as services_payload,
+        ):
+            response = urlopen(request, timeout=5)
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(json.loads(response.read()), {"services": []})
+        services_payload.assert_not_called()
+
     def test_post_exception_is_logged_and_returns_generic_500(self) -> None:
         request = Request(
             f"{self.base_url}/",
