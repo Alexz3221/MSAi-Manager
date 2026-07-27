@@ -24,7 +24,18 @@
         <button class="tool-tab active" type="button" data-tool-target="feed-tool" aria-selected="true">Feed</button>
         <button class="tool-tab" id="john-tab" type="button" data-tool-target="john-tool" aria-selected="false">John</button>
       </nav>
-      <button class="logout-btn" onclick="logout()">Log out</button>
+      <div class="user-profile-header">
+        <div class="profile-avatar">
+          <svg class="avatar-icon" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z" />
+          </svg>
+        </div>
+        <div class="profile-details" aria-live="polite">
+          <strong class="profile-name" id="profile-email">Loading...</strong>
+          <span class="profile-org" id="profile-org">Matching organization...</span>
+        </div>
+        <button class="logout-btn" onclick="logout()">Log out</button>
+      </div>
     </header>
 
     <section class="tool-view" id="feed-tool">
@@ -64,12 +75,7 @@
         <div class="feed" id="feed"></div>
       </section>
       <aside class="panel stats-panel">
-        <div class="profile-panel" aria-live="polite">
-          <span class="eyebrow">Profile</span>
-          <strong class="profile-name" id="profile-email">Loading...</strong>
-          <span class="profile-org" id="profile-org">Matching organization...</span>
-        </div>
-
+        
         <div class="ring-card">
           <div class="ring-wrap">
             <svg class="ring" viewBox="0 0 140 140">
