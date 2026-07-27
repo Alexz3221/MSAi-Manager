@@ -198,6 +198,24 @@ def companies_payload(role: str = "internal") -> dict[str, object]:
         ]
     }
 
+def profile_payload(sess: dict) -> dict[str, object]:
+    email = str(sess.get("email") or "")
+    role = str(sess.get("role") or "customer")
+    company_id = str(sess.get("company_id") or "").strip() or None
+    organization = None
+    if company_id:
+        profile = load_customer_profiles().get(company_id)
+        organization = {
+            "id": company_id,
+            "name": profile.company_name if profile else company_id,
+        }
+    return {
+        "username": email,
+        "email": email,
+        "role": role,
+        "organization": organization,
+    }
+
 def services_payload() -> dict[str, object]:
     services = set()
     for profile in load_customer_profiles().values():
@@ -325,6 +343,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         company_id = sess.get("company_id")
         if parsed_url.path == "/":
             self.send_html(html_page())
+            return
+        if parsed_url.path == "/api/me":
+            self.send_json(200, profile_payload(sess))
             return
         if parsed_url.path == "/api/companies":
             self.send_json(200, companies_payload(role))

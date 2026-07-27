@@ -4,6 +4,7 @@ import json
 import logging
 import threading
 import unittest
+from types import SimpleNamespace
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from unittest.mock import patch
@@ -61,6 +62,41 @@ class RequestLoggingTests(unittest.TestCase):
         self.assertEqual(captured.records[0].trace, "test-get-trace")
         self.assertEqual(captured.records[0].path, "/api/companies")
         self.assertNotIn("query detail", json.dumps(payload))
+
+    def test_profile_endpoint_returns_current_user_and_matched_org(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/me",
+            headers={
+                "Cookie": self.auth_cookie(
+                    email="customer@example.com",
+                    role="customer",
+                    company_id="demo_customer",
+                )
+            },
+        )
+
+        with patch.object(
+            app,
+            "load_customer_profiles",
+            return_value={
+                "demo_customer": SimpleNamespace(
+                    company_id="demo_customer",
+                    company_name="Demo Customer",
+                )
+            },
+        ):
+            response = urlopen(request, timeout=5)
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(
+            json.loads(response.read()),
+            {
+                "username": "customer@example.com",
+                "email": "customer@example.com",
+                "role": "customer",
+                "organization": {"id": "demo_customer", "name": "Demo Customer"},
+            },
+        )
 
     def test_post_exception_is_logged_and_returns_generic_500(self) -> None:
         request = Request(
@@ -222,6 +258,8 @@ class RequestLoggingTests(unittest.TestCase):
             page = app.html_page()
 
         self.assertIn("window.JOHN_ENABLED = false;", page)
+        self.assertIn('id="profile-email"', page)
+        self.assertIn('id="profile-org"', page)
         john_js = (app.STATIC_DIR / "john.js").read_text(encoding = "utf-8")
         self.assertIn('johnTab.textContent = "John (offline)";', john_js)
 

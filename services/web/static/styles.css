@@ -304,6 +304,27 @@
       flex-direction: column;
       gap: 16px;
     }
+
+    .profile-panel {
+      border-bottom: 1px solid var(--grey);
+      padding: 0 0 16px;
+    }
+
+    .profile-name {
+      display: block;
+      font-size: 15px;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .profile-org {
+      color: #4a4a4a;
+      display: block;
+      font-size: 12px;
+      line-height: 1.35;
+      margin-top: 6px;
+      overflow-wrap: anywhere;
+    }
     
     .ring-card {
       background: transparent;
