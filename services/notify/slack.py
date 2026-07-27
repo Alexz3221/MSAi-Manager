@@ -3,6 +3,7 @@ import json
 import os
 import urllib.request
 import logging
+import re
 from functools import lru_cache
 
 from google.cloud.sql.connector import Connector
@@ -10,6 +11,87 @@ from msai_core import matching
 from msai_core.matching import MsaProfile, service_terms
 
 LOGGER = logging.getLogger(__name__)
+
+
+SLACK_WEBHOOK_RE = re.compile(
+    r"^https://hooks\.slack\.com/services/T[\w]+/B[\w]+/[\w]+$"
+)
+
+
+def is_valid_slack_webhook(url: str) -> bool:
+    return bool(SLACK_WEBHOOK_RE.match(url.strip()))
+
+
+def mask_webhook(url: str) -> str:
+    return f"…{url[-8:]}" if len(url) > 8 else "…"
+
+
+def check_table() -> None:
+    conn = _get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS company_channels (
+                company_id TEXT NOT NULL,
+                channel_type TEXT NOT NULL,
+                webhook_url TEXT NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                PRIMARY KEY (company_id, channel_type)
+            )
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_slack_webhook(company_id: str) -> str | None:
+    conn = _get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT webhook_url FROM company_channels "
+            "WHERE company_id = %s AND channel_type = 'slack'",
+            (company_id,),
+        )
+        row = cursor.fetchone()
+        return row[0] if row else None
+    finally:
+        conn.close()
+
+
+def upsert_slack_webhook(company_id: str, webhook_url: str) -> None:
+    conn = _get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO company_channels (company_id, channel_type, webhook_url, updated_at)
+            VALUES (%s, 'slack', %s, now())
+            ON CONFLICT (company_id, channel_type)
+            DO UPDATE SET webhook_url = EXCLUDED.webhook_url, updated_at = now()
+            """,
+            (company_id, webhook_url),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_slack_webhook(company_id: str) -> None:
+    conn = _get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM company_channels WHERE company_id = %s AND channel_type = 'slack'",
+            (company_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 
 
 def profile_dict_to_msa_profile(profile: dict) -> MsaProfile:

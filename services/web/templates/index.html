@@ -23,6 +23,7 @@
       <nav class="tool-nav" aria-label="Tools">
         <button class="tool-tab active" type="button" data-tool-target="feed-tool" aria-selected="true">Feed</button>
         <button class="tool-tab" id="john-tab" type="button" data-tool-target="john-tool" aria-selected="false">John</button>
+        <button class="tool-tab" id="settings-tab" type="button" data-tool-target="settings-tool" aria-selected="false">Settings</button>
       </nav>
       <div class="user-profile-header">
         <div class="profile-avatar">
@@ -123,6 +124,27 @@
         <p class="john-status" id="john-status">Conversation history is temporary and can reset when Cloud Run restarts.</p>
       </div>
     </section>
+
+
+    <section class="tool-view" id="settings-tool" hidden>
+      <div class="panel" style="max-width: 480px;">
+        <h2>Slack notifications</h2>
+        <p class="subtitle" id="slack-status">Checking configuration…</p>
+
+        <div id="settings-company-picker" hidden>
+          <label for="settings-company">Company</label>
+          <select id="settings-company"></select>
+        </div>
+
+        <label for="slack-webhook">Incoming webhook URL</label>
+        <input id="slack-webhook" type="url" placeholder="https://hooks.slack.com/services/...">
+
+        <div style="display:flex; gap:8px; margin-top:12px;">
+          <button type="button" id="slack-save">Save</button>
+          <button type="button" id="slack-remove">Remove</button>
+        </div>
+      </div>
+    </section>
   </main>
 
 <script>
@@ -134,5 +156,6 @@ function logout() {
 
 <script>window.JOHN_ENABLED = __JOHN_ENABLED__;</script>
 <script src="/static/john.js" ></script>
+<script src="/static/settings.js"></script>
 </body>
 </html>

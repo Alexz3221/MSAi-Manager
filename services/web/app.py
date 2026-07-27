@@ -19,9 +19,10 @@ from msai_core.matching import (
 from services.john.john_agent.runtime import JohnRuntime
 from services.web.rate_limit import JohnRateLimiter
 from services.web import users, sessions
-
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 users.init_db()
+from services.notify.slack import check_table
+check_table()
 HOST = "0.0.0.0"
 PORT = int(os.environ.get("PORT", "8080"))
 SERVICE_NAME = os.environ.get("K_SERVICE", "msai-manager")
@@ -406,6 +407,25 @@ class RequestHandler(BaseHTTPRequestHandler):
                     query["company"] = [name]
             self.send_json(200, feed_payload(query, force_company=force))
             return
+        if parsed_url.path == "/api/notifications/slack":
+            from services.notify.slack import get_slack_webhook, mask_webhook
+            if role == "customer":
+                if not company_id:
+                    self.send_json(400, {"error": "Account isn't linked to an organization."})
+                    return
+                target_company = company_id
+            else:
+                target_company = query.get("company_id", [""])[0].strip() or None
+                if not target_company:
+                    self.send_json(400, {"error": "company_id query parameter is required."})
+                    return
+            webhook = get_slack_webhook(target_company)
+            self.send_json(200, {
+                "company_id": target_company,
+                "configured": webhook is not None,
+                "webhook_preview": mask_webhook(webhook) if webhook else None,
+            })
+            return
         self.send_json(404, {"error": "Not found"})
 
     def do_POST(self) -> None:
@@ -526,6 +546,46 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.log_exception("POST")
                 self.send_json(503, {"error": "John is temporarily unavailable."})
             return
+        # --- Slack Integration: requires a session ---------------------------------------
+        if parsed_url.path == "/api/notifications/slack":
+            sess = self.session()
+            if sess is None:
+                self.send_json(401, {"error": "Not authenticated."})
+                return
+            sess = refresh_session_scope(sess)
+            role = sess.get("role", "customer")
+            company_id = sess.get("company_id")
+            body = self.read_json_body()
+            if body is None:
+                self.send_json(400, {"error": "Invalid request body."})
+                return
+
+            if role == "customer":
+                if not company_id:
+                    self.send_json(400, {"error": "Account isn't linked to an organization."})
+                    return
+                target_company = company_id
+            else:
+                target_company = str(body.get("company_id", "")).strip() or None
+                if not target_company:
+                    self.send_json(400, {"error": "company_id is required."})
+                    return
+
+            webhook_url = str(body.get("webhook_url", "")).strip()
+            from services.notify.slack import (
+                delete_slack_webhook, is_valid_slack_webhook, upsert_slack_webhook,
+            )
+            if not webhook_url:
+                delete_slack_webhook(target_company)
+                self.send_json(200, {"ok": True, "configured": False})
+                return
+            if not is_valid_slack_webhook(webhook_url):
+                self.send_json(400, {"error": "That doesn't look like a Slack incoming webhook URL."})
+                return
+            upsert_slack_webhook(target_company, webhook_url)
+            self.send_json(200, {"ok": True, "configured": True})
+            return
+
 
         # --- Pub/Sub push webhook: GCS file ingestion -----------------------
         if parsed_url.path != "/":
