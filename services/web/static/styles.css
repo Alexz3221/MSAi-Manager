@@ -323,6 +323,9 @@
     .feed {
       display: grid;
       gap: 14px;
+      height: 650px;
+      overflow-y: auto;
+      padding-right: 6px;
     }
 
     .feed-card {
