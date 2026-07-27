@@ -469,6 +469,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             from scripts.msa_keyword_extractor import parse_msa_file, write_profile
+            from services.notify.slack import notify_channels, profile_dict_to_msa_profile
             profile = parse_msa_file(bucket_name, blob_name)
             errors = write_profile(profile)
             if errors:
@@ -483,6 +484,17 @@ class RequestHandler(BaseHTTPRequestHandler):
                 )
                 self.send_json(500, {"error": "Failed to write MSA profile"})
                 return
+        # --- Slack Integration-----------------------
+            try:
+                notify_channels(profile_dict_to_msa_profile(profile))
+            except Exception:
+                LOGGER.exception(
+                    "Failed to send notification",
+                    extra={
+                        **self.log_context("POST"),
+                        "event": "notification_failed",
+                    },
+                )
             self.send_response(204)
             self.end_headers()
         except Exception:
