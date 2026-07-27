@@ -98,6 +98,48 @@ class RequestLoggingTests(unittest.TestCase):
             },
         )
 
+    def test_profile_endpoint_refreshes_stale_unmatched_session(self) -> None:
+        cookie = self.auth_cookie(
+            email="aefnoo@broadcam.com",
+            role="customer",
+            company_id=None,
+        )
+        request = Request(
+            f"{self.base_url}/api/me",
+            headers={"Cookie": cookie},
+        )
+
+        with (
+            patch.object(
+                app.users,
+                "resolve_role_company",
+                return_value=("customer", "broadcom"),
+            ) as resolve,
+            patch.object(
+                app,
+                "load_customer_profiles",
+                return_value={
+                    "broadcom": SimpleNamespace(
+                        company_id="broadcom",
+                        company_name="Broadcom",
+                    )
+                },
+            ),
+        ):
+            response = urlopen(request, timeout=5)
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(
+            json.loads(response.read()),
+            {
+                "username": "aefnoo@broadcam.com",
+                "email": "aefnoo@broadcam.com",
+                "role": "customer",
+                "organization": {"id": "broadcom", "name": "Broadcom"},
+            },
+        )
+        resolve.assert_called_once_with("aefnoo@broadcam.com")
+
     def test_post_exception_is_logged_and_returns_generic_500(self) -> None:
         request = Request(
             f"{self.base_url}/",

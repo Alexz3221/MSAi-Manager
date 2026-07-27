@@ -79,6 +79,24 @@ class UserMatchingTests(unittest.TestCase):
                 ("customer", "vantage_point_analytics"),
             )
 
+    def test_fuzzy_domain_label_matches_broadcam_to_broadcom(self) -> None:
+        profiles = {
+            "broadcom": customer_profile("broadcom", "Broadcom"),
+            "pinehollow_retail_corp": customer_profile(
+                "pinehollow_retail_corp",
+                "Pinehollow Retail Corp.",
+            ),
+        }
+
+        with (
+            patch.dict(users.CUSTOMER_DOMAIN_ALIASES, {}, clear=True),
+            patch("msai_core.matching.load_customer_profiles", return_value=profiles),
+        ):
+            self.assertEqual(
+                users.resolve_role_company("aefnoo@broadcam.com"),
+                ("customer", "broadcom"),
+            )
+
     def test_fuzzy_domain_label_rejects_ambiguous_best_fit(self) -> None:
         profiles = {
             "vantage_point_analytics": customer_profile(

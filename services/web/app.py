@@ -216,6 +216,19 @@ def profile_payload(sess: dict) -> dict[str, object]:
         "organization": organization,
     }
 
+def refresh_session_scope(sess: dict) -> dict:
+    email = str(sess.get("email") or "").strip()
+    if not email:
+        return sess
+    role, company_id = users.resolve_role_company(email)
+    current_company_id = sess.get("company_id")
+    sess["role"] = role
+    if role == "internal":
+        sess["company_id"] = None
+    elif company_id is not None or current_company_id is None:
+        sess["company_id"] = company_id
+    return sess
+
 def services_payload() -> dict[str, object]:
     services = set()
     for profile in load_customer_profiles().values():
@@ -339,6 +352,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         if sess is None:
             self.redirect("/login")
             return
+        sess = refresh_session_scope(sess)
         role = sess.get("role", "customer")
         company_id = sess.get("company_id")
         if parsed_url.path == "/":
