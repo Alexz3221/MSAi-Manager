@@ -69,6 +69,8 @@ server-side from the email domain:
 - Active browser sessions refresh their derived company match on authenticated
   requests.
 - Customer users without a matched company get an empty feed and service list.
+- John does not accept chat-supplied company names as a substitute for a matched
+  session company.
 - Email ownership is not verified, so this is demo scoping, not production auth.
 
 ## Repository Guide

@@ -252,6 +252,11 @@ class RequestLoggingTests(unittest.TestCase):
                 "check",
                 return_value=RateLimitDecision(allowed=True),
             ) as rate_limit,
+            patch.object(
+                app.users,
+                "resolve_role_company",
+                return_value=("customer", "demo_customer"),
+            ),
             patch.object(app.JOHN_RUNTIME, "chat", return_value=expected) as chat,
         ):
             response = urlopen(request, timeout=5)
@@ -267,6 +272,49 @@ class RequestLoggingTests(unittest.TestCase):
             company_id="demo_customer",
             principal_email="customer@example.com",
         )
+
+    def test_john_endpoint_does_not_accept_company_from_unmatched_customer(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/john",
+            data=json.dumps(
+                {
+                    "message": "broadcom",
+                    "user_id": "browser-user",
+                    "session_id": "existing-session",
+                }
+            ).encode(),
+            headers={
+                "Cookie": self.auth_cookie(
+                    email="unmatched@example.invalid",
+                    role="customer",
+                    company_id=None,
+                ),
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with (
+            patch.object(
+                app.users,
+                "resolve_role_company",
+                return_value=("customer", None),
+            ),
+            patch.object(app.JOHN_RATE_LIMITER, "check") as rate_limit,
+            patch.object(app.JOHN_RUNTIME, "chat") as chat,
+        ):
+            response = urlopen(request, timeout=5)
+
+        self.assertEqual(response.status, 200)
+        payload = json.loads(response.read())
+        self.assertEqual(payload["session_id"], "existing-session")
+        self.assertEqual(payload["tools"], [])
+        self.assertIn("isn't matched to an organization", payload["reply"])
+        self.assertIn("can't accept a company name in chat", payload["reply"])
+        self.assertNotIn("share the name", payload["reply"].casefold())
+        self.assertNotIn("representing", payload["reply"].casefold())
+        rate_limit.assert_not_called()
+        chat.assert_not_called()
 
     def test_john_endpoint_rejects_an_empty_message(self) -> None:
         request = Request(

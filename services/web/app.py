@@ -182,6 +182,18 @@ def empty_feed_payload(
         "items": [],
     }
 
+def unmatched_customer_john_payload(session_id: str | None) -> dict[str, object]:
+    return {
+        "session_id": session_id,
+        "reply": (
+            "I can't look up customer-specific MSA notices because this account "
+            "isn't matched to an organization. I can't accept a company name in "
+            "chat for access; please sign in with a demo email domain that "
+            "matches an organization or ask an administrator to link the account."
+        ),
+        "tools": [],
+    }
+
 def feed_payload(query: dict[str, list[str]], force_company: str | None = None) -> dict[str, object]:
     if force_company is not None:
         company = force_company
@@ -468,6 +480,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                     raise ValueError("User ID must be between 1 and 128 characters.")
                 if session_id and len(session_id) > 128:
                     raise ValueError("Session ID must be 128 characters or fewer.")
+                if sess.get("role", "customer") == "customer" and not sess.get("company_id"):
+                    self.send_json(200, unmatched_customer_john_payload(session_id))
+                    return
                 rate_limit = JOHN_RATE_LIMITER.check(self.client_key())
                 
                 if not rate_limit.allowed:
