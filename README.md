@@ -53,6 +53,17 @@ deliveries from `msa_manager.v_msa_daily_queue` into
 `msa_manager.msa_daily_queue` at 00:00 UTC. Cloud Scheduler runs
 `msai-manager-combine-and-send` against that queue.
 
+## Demo Auth
+
+Users register or log in with an email address. The app derives role and company
+server-side from the email domain:
+
+- `google.com` is treated as internal.
+- Customer domains are matched against `customer_profiles`.
+- Demo matching accepts compact names, common aliases, legal-suffix-stripped
+  names, and high-confidence fuzzy matches.
+- Email ownership is not verified, so this is demo scoping, not production auth.
+
 ## Repository Guide
 
 ```text
@@ -119,6 +130,9 @@ CUSTOMER_DATA_BUCKET=
 JOHN_ENABLED=true
 JOHN_RATE_LIMIT_PER_CLIENT=25
 JOHN_RATE_LIMIT_GLOBAL=300
+CUSTOMER_DOMAIN_ALIASES=
+CUSTOMER_DOMAIN_FUZZY_MIN_SCORE=0.82
+CUSTOMER_DOMAIN_FUZZY_MIN_MARGIN=0.08
 LOG_LEVEL=INFO
 ```
 
@@ -197,6 +211,7 @@ prototype advisor rather than durable chat storage.
 | `/` | Browser feed and John UI |
 | `/health` | Basic health check |
 | `/api/companies` | Customer list |
+| `/api/me` | Signed-in user and matched organization |
 | `/api/services` | Service list |
 | `/api/feed` | Filterable MSA feed |
 | `/api/john` | John chat endpoint |
