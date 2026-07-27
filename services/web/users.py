@@ -16,6 +16,7 @@ import sqlite3
 import datetime as dt
 import tempfile
 import re
+from difflib import SequenceMatcher
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -40,6 +41,11 @@ CUSTOMER_DOMAIN_ALIASES = {
     for key, value in [item.split("=", 1)]
     if key.strip() and value.strip()
 }
+FUZZY_MIN_SCORE = float(os.environ.get("CUSTOMER_DOMAIN_FUZZY_MIN_SCORE", "0.82"))
+FUZZY_MIN_MARGIN = float(os.environ.get("CUSTOMER_DOMAIN_FUZZY_MIN_MARGIN", "0.08"))
+FUZZY_MIN_QUERY_LENGTH = int(
+    os.environ.get("CUSTOMER_DOMAIN_FUZZY_MIN_QUERY_LENGTH", "8")
+)
 
 
 @dataclass(frozen=True)
@@ -96,14 +102,46 @@ def _find_company_compact(company_query: str, companies: dict) -> str | None:
     wanted = _compact(company_query)
     if not wanted:
         return None
+    hits = []
     for company_id, profile in companies.items():
         candidates = {
             _compact(company_id),
             _compact(profile.company_name),
         }
         if any(wanted in candidate or candidate in wanted for candidate in candidates):
-            return company_id
-    return None
+            hits.append(company_id)
+    unique_hits = list(dict.fromkeys(hits))
+    return unique_hits[0] if len(unique_hits) == 1 else None
+
+
+def _find_company_fuzzy(company_query: str, companies: dict) -> str | None:
+    wanted = _compact(company_query)
+    if len(wanted) < FUZZY_MIN_QUERY_LENGTH:
+        return None
+
+    scores: list[tuple[float, str]] = []
+    for company_id, profile in companies.items():
+        candidates = {
+            _compact(company_id),
+            _compact(profile.company_name),
+        }
+        best_score = max(
+            (
+                SequenceMatcher(None, wanted, candidate).ratio()
+                for candidate in candidates
+                if candidate
+            ),
+            default=0.0,
+        )
+        scores.append((best_score, company_id))
+
+    scores.sort(reverse=True)
+    if not scores or scores[0][0] < FUZZY_MIN_SCORE:
+        return None
+    second_score = scores[1][0] if len(scores) > 1 else 0.0
+    if scores[0][0] - second_score < FUZZY_MIN_MARGIN:
+        return None
+    return scores[0][1]
 
 
 def _find_company_for_domain(domain: str, companies: dict) -> str | None:
@@ -127,6 +165,11 @@ def _find_company_for_domain(domain: str, companies: dict) -> str | None:
         )
         if hit is not None:
             return hit
+
+    for candidate in _domain_candidates(domain):
+        hit = _find_company_fuzzy(candidate, companies)
+        if hit is not None:
+            return hit
     return None
 
 
@@ -135,7 +178,8 @@ def resolve_role_company(email: str) -> tuple[str, str | None]:
 
     Customer company_id resolution is best-effort against customer_profiles;
     adjust once that table holds real domain-keyed customer data. For the demo,
-    CUSTOMER_DOMAIN_ALIASES can map a domain or domain label to a company query.
+    CUSTOMER_DOMAIN_ALIASES can map a domain or domain label to a company query,
+    and a final high-confidence fuzzy pass catches obvious demo typos.
     """
     domain = _domain(email)
     if domain in INTERNAL_DOMAINS:

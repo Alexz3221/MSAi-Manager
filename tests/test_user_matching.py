@@ -58,6 +58,48 @@ class UserMatchingTests(unittest.TestCase):
                 ("customer", "vantage_point_analytics"),
             )
 
+    def test_fuzzy_domain_label_matches_confident_typo(self) -> None:
+        profiles = {
+            "vantage_point_analytics": customer_profile(
+                "vantage_point_analytics",
+                "Vantage Point Analytics",
+            ),
+            "pinehollow_retail_corp": customer_profile(
+                "pinehollow_retail_corp",
+                "Pinehollow Retail Corp.",
+            ),
+        }
+
+        with (
+            patch.dict(users.CUSTOMER_DOMAIN_ALIASES, {}, clear=True),
+            patch("msai_core.matching.load_customer_profiles", return_value=profiles),
+        ):
+            self.assertEqual(
+                users.resolve_role_company("demo@vantagepontanalytics.com"),
+                ("customer", "vantage_point_analytics"),
+            )
+
+    def test_fuzzy_domain_label_rejects_ambiguous_best_fit(self) -> None:
+        profiles = {
+            "vantage_point_analytics": customer_profile(
+                "vantage_point_analytics",
+                "Vantage Point Analytics",
+            ),
+            "vantage_point_advisors": customer_profile(
+                "vantage_point_advisors",
+                "Vantage Point Advisors",
+            ),
+        }
+
+        with (
+            patch.dict(users.CUSTOMER_DOMAIN_ALIASES, {}, clear=True),
+            patch("msai_core.matching.load_customer_profiles", return_value=profiles),
+        ):
+            self.assertEqual(
+                users.resolve_role_company("demo@vantagepoint.com"),
+                ("customer", None),
+            )
+
     def test_login_refreshes_previous_unmapped_company(self) -> None:
         profiles = {
             "vantage_point_analytics": customer_profile(
