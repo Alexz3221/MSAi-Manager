@@ -532,7 +532,8 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
-      min-height: 360px;
+      height: 360px; 
+      overflow-y: auto; /*may break John layout tbd*/
       padding: 24px;
     }
 
