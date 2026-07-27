@@ -81,7 +81,10 @@ class UserMatchingTests(unittest.TestCase):
 
     def test_fuzzy_domain_label_matches_broadcam_to_broadcom(self) -> None:
         profiles = {
-            "broadcom": customer_profile("broadcom", "Broadcom"),
+            "broadcom-corporation": customer_profile(
+                "broadcom-corporation",
+                "Broadcom Corporation",
+            ),
             "pinehollow_retail_corp": customer_profile(
                 "pinehollow_retail_corp",
                 "Pinehollow Retail Corp.",
@@ -94,7 +97,7 @@ class UserMatchingTests(unittest.TestCase):
         ):
             self.assertEqual(
                 users.resolve_role_company("aefnoo@broadcam.com"),
-                ("customer", "broadcom"),
+                ("customer", "broadcom-corporation"),
             )
 
     def test_fuzzy_domain_label_rejects_ambiguous_best_fit(self) -> None:

@@ -46,6 +46,17 @@ FUZZY_MIN_MARGIN = float(os.environ.get("CUSTOMER_DOMAIN_FUZZY_MIN_MARGIN", "0.0
 FUZZY_MIN_QUERY_LENGTH = int(
     os.environ.get("CUSTOMER_DOMAIN_FUZZY_MIN_QUERY_LENGTH", "8")
 )
+LEGAL_SUFFIXES = {
+    "co",
+    "company",
+    "corp",
+    "corporation",
+    "inc",
+    "incorporated",
+    "llc",
+    "ltd",
+    "limited",
+}
 
 
 @dataclass(frozen=True)
@@ -98,16 +109,24 @@ def _compact(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", value.casefold())
 
 
+def _company_match_candidates(company_id: str, company_name: str) -> set[str]:
+    candidates = {_compact(company_id), _compact(company_name)}
+    for value in (company_id, company_name):
+        tokens = re.findall(r"[a-z0-9]+", value.casefold())
+        while tokens and tokens[-1] in LEGAL_SUFFIXES:
+            tokens.pop()
+        if tokens:
+            candidates.add("".join(tokens))
+    return {candidate for candidate in candidates if candidate}
+
+
 def _find_company_compact(company_query: str, companies: dict) -> str | None:
     wanted = _compact(company_query)
     if not wanted:
         return None
     hits = []
     for company_id, profile in companies.items():
-        candidates = {
-            _compact(company_id),
-            _compact(profile.company_name),
-        }
+        candidates = _company_match_candidates(company_id, profile.company_name)
         if any(wanted in candidate or candidate in wanted for candidate in candidates):
             hits.append(company_id)
     unique_hits = list(dict.fromkeys(hits))
@@ -121,10 +140,7 @@ def _find_company_fuzzy(company_query: str, companies: dict) -> str | None:
 
     scores: list[tuple[float, str]] = []
     for company_id, profile in companies.items():
-        candidates = {
-            _compact(company_id),
-            _compact(profile.company_name),
-        }
+        candidates = _company_match_candidates(company_id, profile.company_name)
         best_score = max(
             (
                 SequenceMatcher(None, wanted, candidate).ratio()
