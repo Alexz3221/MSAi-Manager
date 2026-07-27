@@ -4,6 +4,7 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
+from google.api_core.exceptions import BadRequest
 from google.cloud import bigquery
 
 from scripts import asset_checker, msa_keyword_extractor
@@ -50,6 +51,26 @@ class IngestionWriteTests(unittest.TestCase):
                 {"account": "Demo", "client_id": None, "active_services": []},
                 client=MagicMock(),
             )
+
+    def test_customer_writer_retries_concurrent_bigquery_updates(self) -> None:
+        client = MagicMock()
+        first_job = MagicMock()
+        first_job.result.side_effect = BadRequest(
+            "Could not serialize access to table test-project:test_dataset.customer_profiles "
+            "due to concurrent update"
+        )
+        second_job = MagicMock()
+        client.query.side_effect = [first_job, second_job]
+        sleeps: list[int] = []
+
+        asset_checker._run_query_with_concurrent_update_retry(
+            client,
+            "SELECT 1",
+            sleep=sleeps.append,
+        )
+
+        self.assertEqual(client.query.call_count, 2)
+        self.assertEqual(sleeps, [1])
 
     def test_msa_writer_uses_environment_target_and_replaces_by_msa_id(self) -> None:
         client = MagicMock()

@@ -2,8 +2,10 @@ import json
 import logging
 import os
 import re
+import time
 import uuid
 
+from google.api_core.exceptions import BadRequest
 from google.cloud import bigquery, storage
 
 LOGGER = logging.getLogger(__name__)
@@ -30,6 +32,27 @@ def read_gcs_file(bucket_name: str, file_path: str) -> str:
     blob = bucket.blob(file_path)
 
     return blob.download_as_text()
+
+
+def _is_concurrent_update_error(exc: BadRequest) -> bool:
+    return "Could not serialize access to table" in str(exc)
+
+
+def _run_query_with_concurrent_update_retry(
+    bq_client: bigquery.Client,
+    query: str,
+    *,
+    max_attempts: int = 5,
+    sleep=time.sleep,
+) -> None:
+    for attempt in range(max_attempts):
+        try:
+            bq_client.query(query).result()
+            return
+        except BadRequest as exc:
+            if not _is_concurrent_update_error(exc) or attempt == max_attempts - 1:
+                raise
+            sleep(2**attempt)
 
 
 def transform_txt_to_dict(text_content: str) -> dict:
@@ -114,7 +137,7 @@ def merge_via_staging(
                 "target_table": target_ref,
             },
         )
-        bq_client.query(replace_query).result()
+        _run_query_with_concurrent_update_retry(bq_client, replace_query)
     finally:
         try:
             bq_client.delete_table(staging_ref, not_found_ok=True)
