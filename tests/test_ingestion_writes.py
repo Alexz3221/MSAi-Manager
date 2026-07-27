@@ -32,9 +32,12 @@ class IngestionWriteTests(unittest.TestCase):
         )
 
         query = client.query.call_args.args[0]
+        self.assertIn("DECLARE staged_client_id STRING", query)
+        self.assertIn("SET (staged_client_id, staged_account)", query)
         self.assertIn("BEGIN TRANSACTION", query)
-        self.assertIn("LOWER(TRIM(target.client_id))", query)
-        self.assertIn("LOWER(TRIM(target.account))", query)
+        self.assertIn("LOWER(TRIM(client_id)) = staged_client_id", query)
+        self.assertIn("LOWER(TRIM(account)) = staged_account", query)
+        self.assertNotIn("WHERE EXISTS", query)
         self.assertIn("INSERT INTO `test-project.test_dataset.customer_profiles`", query)
         client.delete_table.assert_called_once()
 

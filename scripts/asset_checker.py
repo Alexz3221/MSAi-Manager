@@ -85,15 +85,20 @@ def merge_via_staging(
         load_job.result()
 
         replace_query = f"""
+        DECLARE staged_client_id STRING;
+        DECLARE staged_account STRING;
+
+        SET (staged_client_id, staged_account) = (
+          SELECT AS STRUCT LOWER(TRIM(client_id)), LOWER(TRIM(account))
+          FROM `{staging_ref}`
+          LIMIT 1
+        );
+
         BEGIN TRANSACTION;
 
-        DELETE FROM `{target_ref}` AS target
-        WHERE EXISTS (
-          SELECT 1
-          FROM `{staging_ref}` AS staged
-          WHERE LOWER(TRIM(target.client_id)) = LOWER(TRIM(staged.client_id))
-             OR LOWER(TRIM(target.account)) = LOWER(TRIM(staged.account))
-        );
+        DELETE FROM `{target_ref}`
+        WHERE LOWER(TRIM(client_id)) = staged_client_id
+           OR LOWER(TRIM(account)) = staged_account;
 
         INSERT INTO `{target_ref}` (account, client_id, active_services)
         SELECT account, client_id, active_services
