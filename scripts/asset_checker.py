@@ -1,15 +1,29 @@
 import json
 import logging
+import os
 import re
+import time
+import uuid
+
+from google.api_core.exceptions import BadRequest
 from google.cloud import bigquery, storage
 
-storage_client = storage.Client()
-bq_client = bigquery.Client()
 LOGGER = logging.getLogger(__name__)
 
-DATASET_ID = "msa_manager"
-TABLE_ID = "customer_profiles"
-STAGING_TABLE_ID = "customer_profiles_staging"
+DATASET_ID = os.environ.get("BQ_DATASET", "msa_manager")
+TABLE_ID = os.environ.get("BQ_CUSTOMERS_TABLE", "customer_profiles")
+STAGING_TABLE_ID = os.environ.get(
+    "BQ_CUSTOMERS_STAGING_TABLE",
+    "customer_profiles_staging",
+)
+
+
+def bigquery_client() -> bigquery.Client:
+    project = os.environ.get("BQ_PROJECT_ID") or os.environ.get(
+        "GOOGLE_CLOUD_PROJECT"
+    )
+    return bigquery.Client(project=project) if project else bigquery.Client()
+
 
 def read_gcs_file(bucket_name: str, file_path: str) -> str:
     # Downloads text content directly from GCS into memory
@@ -18,6 +32,27 @@ def read_gcs_file(bucket_name: str, file_path: str) -> str:
     blob = bucket.blob(file_path)
 
     return blob.download_as_text()
+
+
+def _is_concurrent_update_error(exc: BadRequest) -> bool:
+    return "Could not serialize access to table" in str(exc)
+
+
+def _run_query_with_concurrent_update_retry(
+    bq_client: bigquery.Client,
+    query: str,
+    *,
+    max_attempts: int = 5,
+    sleep=time.sleep,
+) -> None:
+    for attempt in range(max_attempts):
+        try:
+            bq_client.query(query).result()
+            return
+        except BadRequest as exc:
+            if not _is_concurrent_update_error(exc) or attempt == max_attempts - 1:
+                raise
+            sleep(2**attempt)
 
 
 def transform_txt_to_dict(text_content: str) -> dict:
@@ -36,54 +71,85 @@ def transform_txt_to_dict(text_content: str) -> dict:
 
 
 def merge_via_staging(
-    dataset_id: str, target_table: str, staging_table: str, record: dict
+    dataset_id: str,
+    target_table: str,
+    staging_table: str,
+    record: dict,
+    *,
+    client: bigquery.Client | None = None,
 ) -> None:
-    """Loads record into staging via batch load, then MERGEs into the main target table."""
-    bq_client = bigquery.Client()
+    """Replace one customer profile through an isolated batch staging table."""
+    if not record.get("account") or not record.get("client_id"):
+        raise ValueError("Customer profiles require non-empty account and client_id.")
+
+    bq_client = client or bigquery_client()
     target_ref = f"{bq_client.project}.{dataset_id}.{target_table}"
-    staging_ref = f"{bq_client.project}.{dataset_id}.{staging_table}"
+    staging_ref = (
+        f"{bq_client.project}.{dataset_id}.{staging_table}_{uuid.uuid4().hex}"
+    )
+    target_schema = bq_client.get_table(target_ref).schema
 
-    # Step 1: Overwrite the staging table using a batch load job.
-    # Batch loads completely bypass BigQuery's streaming buffer.
     load_config = bigquery.LoadJobConfig(
-        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE
+        schema=target_schema,
+        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
     )
 
-    LOGGER.info(
-        "Loading incoming customer profile into staging table",
-        extra={
-            "event": "customer_profile_staging_load_started",
-            "staging_table": staging_ref,
-        },
-    )
-    load_job = bq_client.load_table_from_json(
-        [record], staging_ref, job_config=load_config
-    )
-    load_job.result()  # Wait for batch load to complete
+    try:
+        LOGGER.info(
+            "Loading incoming customer profile into staging table",
+            extra={
+                "event": "customer_profile_staging_load_started",
+                "staging_table": staging_ref,
+            },
+        )
+        load_job = bq_client.load_table_from_json(
+            [record], staging_ref, job_config=load_config
+        )
+        load_job.result()
 
-    # Step 2: Merge staging table data into the main table
-    merge_query = f"""
-    MERGE `{target_ref}` T
-    USING `{staging_ref}` S
-    ON T.account = S.account
-    WHEN MATCHED THEN
-      UPDATE SET 
-        client_id = S.client_id, 
-        active_services = S.active_services
-    WHEN NOT MATCHED THEN
-      INSERT (account, client_id, active_services)
-      VALUES (S.account, S.client_id, S.active_services)
-    """
+        replace_query = f"""
+        DECLARE staged_client_id STRING;
+        DECLARE staged_account STRING;
 
-    LOGGER.info(
-        "Merging customer profile staging data",
-        extra={
-            "event": "customer_profile_merge_started",
-            "target_table": target_ref,
-        },
-    )
-    query_job = bq_client.query(merge_query)
-    query_job.result()  # Wait for query completion
+        SET (staged_client_id, staged_account) = (
+          SELECT AS STRUCT LOWER(TRIM(client_id)), LOWER(TRIM(account))
+          FROM `{staging_ref}`
+          LIMIT 1
+        );
+
+        BEGIN TRANSACTION;
+
+        DELETE FROM `{target_ref}`
+        WHERE LOWER(TRIM(client_id)) = staged_client_id
+           OR LOWER(TRIM(account)) = staged_account;
+
+        INSERT INTO `{target_ref}` (account, client_id, active_services)
+        SELECT account, client_id, active_services
+        FROM `{staging_ref}`;
+
+        COMMIT TRANSACTION;
+        """
+
+        LOGGER.info(
+            "Replacing customer profile from staging data",
+            extra={
+                "event": "customer_profile_merge_started",
+                "target_table": target_ref,
+            },
+        )
+        _run_query_with_concurrent_update_retry(bq_client, replace_query)
+    finally:
+        try:
+            bq_client.delete_table(staging_ref, not_found_ok=True)
+        except Exception:
+            LOGGER.warning(
+                "Could not remove customer profile staging table",
+                extra={
+                    "event": "customer_profile_staging_cleanup_failed",
+                    "staging_table": staging_ref,
+                },
+                exc_info=True,
+            )
 
     LOGGER.info(
         "Customer profile merged",

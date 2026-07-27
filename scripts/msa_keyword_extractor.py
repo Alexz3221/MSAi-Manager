@@ -8,20 +8,21 @@ Handles both corpus formats:
 
 import json
 import logging
+import os
 import re
 import sys
+import uuid
 from datetime import datetime
 from pathlib import Path
-from google.cloud import storage, bigquery
 
-_gcs = storage.Client()
-_bq = bigquery.Client()
+from google.cloud import bigquery, storage
+
 LOGGER = logging.getLogger(__name__)
 
 # canonical name -> surface forms seen in the wild
-#test commut
 SERVICE_ALIASES = {
     "apigee":                   ["apigee", "apigee hybrid", "apigee x", "apigee edge"],
+    "app engine":               ["app engine", "appengine"],
     "artifact registry":        ["artifact registry"],
     "bigquery":                 ["bigquery", "big query"],
     "bigtable":                 ["bigtable", "cloud bigtable"],
@@ -124,7 +125,7 @@ DISTRIBUTION_DATE_PATTERNS = [
 
 
 def parse_msa_file(bucket_name, blob_name):
-    blob = _gcs.bucket(bucket_name).blob(blob_name)
+    blob = storage.Client().bucket(bucket_name).blob(blob_name)
     text = normalize(blob.download_as_text())
     msa_id = Path(blob_name).stem   # same id derivation as before
 
@@ -214,8 +215,21 @@ def parse_msa_file(bucket_name, blob_name):
         "_match_scope": scope,
     }
 
-BQ_TABLE = "sprinternship-bld-2026.msa_manager.msa_updates"
-def write_profile(profile):
+def bigquery_client() -> bigquery.Client:
+    project = os.environ.get("BQ_PROJECT_ID") or os.environ.get(
+        "GOOGLE_CLOUD_PROJECT"
+    )
+    return bigquery.Client(project=project) if project else bigquery.Client()
+
+
+def msa_table_ref(client: bigquery.Client) -> str:
+    dataset = os.environ.get("BQ_DATASET", "msa_manager")
+    table = os.environ.get("BQ_MSA_UPDATES_TABLE", "msa_updates")
+    return f"{client.project}.{dataset}.{table}"
+
+
+def write_profile(profile, *, client: bigquery.Client | None = None):
+    """Idempotently replace one MSA profile using an isolated staging table."""
     # always write -- an unmatched MSA must be visible, not silently dropped
     if not profile["affected_services"]:
         LOGGER.warning(
@@ -225,18 +239,67 @@ def write_profile(profile):
                 "msa_id": profile["msa_id"],
             },
         )
-    errors = _bq.insert_rows_json(BQ_TABLE, [profile])
-    if errors:
+
+    bq_client = client or bigquery_client()
+    target_ref = msa_table_ref(bq_client)
+    dataset_ref = target_ref.rsplit(".", 1)[0]
+    staging_ref = f"{dataset_ref}._msa_updates_staging_{uuid.uuid4().hex}"
+    target_schema = bq_client.get_table(target_ref).schema
+    load_config = bigquery.LoadJobConfig(
+        schema=target_schema,
+        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+    )
+    columns = list(profile)
+    quoted_columns = ", ".join(f"`{column}`" for column in columns)
+    selected_columns = ", ".join(f"staged.`{column}`" for column in columns)
+    replace_query = f"""
+    BEGIN TRANSACTION;
+
+    DELETE FROM `{target_ref}` AS target
+    WHERE target.msa_id IN (
+      SELECT staged.msa_id
+      FROM `{staging_ref}` AS staged
+    );
+
+    INSERT INTO `{target_ref}` ({quoted_columns})
+    SELECT {selected_columns}
+    FROM `{staging_ref}` AS staged;
+
+    COMMIT TRANSACTION;
+    """
+
+    try:
+        bq_client.load_table_from_json(
+            [profile],
+            staging_ref,
+            job_config=load_config,
+        ).result()
+        bq_client.query(replace_query).result()
+    except Exception:
         LOGGER.error(
             "Failed to write MSA profile to BigQuery",
             extra={
                 "event": "msa_profile_write_failed",
                 "msa_id": profile["msa_id"],
-                "error_count": len(errors),
-                "errors": errors,
+                "target_table": target_ref,
             },
+            exc_info=True,
         )
-    return errors
+        raise
+    finally:
+        try:
+            bq_client.delete_table(staging_ref, not_found_ok=True)
+        except Exception:
+            LOGGER.warning(
+                "Could not remove MSA staging table",
+                extra={
+                    "event": "msa_staging_cleanup_failed",
+                    "staging_table": staging_ref,
+                },
+                exc_info=True,
+            )
+
+    return []
 
 
 if __name__ == "__main__":
@@ -246,7 +309,7 @@ if __name__ == "__main__":
     bucket_name = sys.argv[1]
     prefix = sys.argv[2] if len(sys.argv) > 2 else ""
 
-    for blob in _gcs.list_blobs(bucket_name, prefix=prefix):
+    for blob in storage.Client().list_blobs(bucket_name, prefix=prefix):
         if not blob.name.endswith(".txt"):
             continue
         p = parse_msa_file(bucket_name, blob.name)

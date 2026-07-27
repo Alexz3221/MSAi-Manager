@@ -79,31 +79,28 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
 
         self.assertIn("distribution_date", query.call_args.args[0])
 
-    def test_daily_queue_joins_canonical_msa_updates_and_deduplicates(self) -> None:
+    def test_daily_queue_reads_scheduled_query_rows_and_deduplicates(self) -> None:
         as_of = date(2026, 7, 20)
         settings = {
             "BQ_PROJECT_ID": "test-project",
             "BQ_DATASET": "msa_manager",
             "BQ_MSA_UPDATES_TABLE": "msa_updates",
-            "BQ_QUEUE_DATASET": "msa_dataset",
+            "BQ_QUEUE_DATASET": "msa_manager",
             "BQ_DAILY_QUEUE_TABLE": "msa_daily_queue",
         }
 
         with (
             patch.dict(os.environ, settings, clear=False),
-            patch.object(
-                bigquery,
-                "_queue_partition_field",
-                return_value="_PARTITIONTIME",
-            ),
             patch.object(bigquery, "_query_records", return_value=[]) as query,
         ):
             self.assertEqual(bigquery.load_pending_queue_records(as_of), [])
 
         sql, parameters = query.call_args.args
-        self.assertIn("`test-project.msa_dataset.msa_daily_queue`", sql)
+        self.assertIn("`test-project.msa_manager.msa_daily_queue`", sql)
         self.assertIn("`test-project.msa_manager.msa_updates`", sql)
-        self.assertIn("q._PARTITIONDATE = @as_of", sql)
+        self.assertIn("TRIM(q.customer_id) AS client_id", sql)
+        self.assertIn("MAX(q.details) AS update_details", sql)
+        self.assertIn("DATE(q.processed_at) <= @as_of", sql)
         self.assertIn("GROUP BY msa_id, client_id", sql)
         self.assertIn("LEFT JOIN latest_msa_updates", sql)
         self.assertIn("IN ('pending', 'queued', 'failed')", sql)
@@ -111,40 +108,17 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
         self.assertNotIn("TIMESTAMP_SUB", sql)
         self.assertEqual(parameters, [("as_of", "DATE", as_of)])
 
-    def test_queue_requires_partitioning(self) -> None:
-        settings = {
-            "BQ_PROJECT_ID": "test-project",
-            "BQ_DATASET": "msa_manager",
-            "BQ_QUEUE_DATASET": "msa_dataset",
-            "BQ_DAILY_QUEUE_TABLE": "msa_daily_queue",
-        }
-
-        with (
-            patch.dict(os.environ, settings, clear=False),
-            patch.object(bigquery, "_queue_partition_field", return_value=None),
-            patch.object(bigquery, "_query_records") as query,
-        ):
-            with self.assertRaisesRegex(RuntimeError, "must be time-partitioned"):
-                bigquery.load_pending_queue_records(date(2026, 7, 20))
-
-        query.assert_not_called()
-
     def test_sent_queue_update_is_scoped_to_one_pending_delivery(self) -> None:
         as_of = date(2026, 7, 20)
         settings = {
             "BQ_PROJECT_ID": "test-project",
             "BQ_DATASET": "msa_manager",
-            "BQ_QUEUE_DATASET": "msa_dataset",
+            "BQ_QUEUE_DATASET": "msa_manager",
             "BQ_DAILY_QUEUE_TABLE": "msa_daily_queue",
         }
 
         with (
             patch.dict(os.environ, settings, clear=False),
-            patch.object(
-                bigquery,
-                "_queue_partition_field",
-                return_value="processed_at",
-            ),
             patch.object(bigquery, "_execute_dml", return_value=2) as execute,
         ):
             affected = bigquery.mark_queue_record_sent(
@@ -157,13 +131,9 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
         sql, parameters = execute.call_args.args
         self.assertIn("status = 'sent'", sql)
         self.assertNotIn("SET processed_at", sql)
-        self.assertIn("q.`processed_at` >= TIMESTAMP(@as_of)", sql)
-        self.assertIn(
-            "q.`processed_at` < TIMESTAMP(DATE_ADD(@as_of, INTERVAL 1 DAY))",
-            sql,
-        )
+        self.assertIn("DATE(q.processed_at) <= @as_of", sql)
         self.assertIn("TRIM(q.msa_id) = @msa_id", sql)
-        self.assertIn("TRIM(q.client_id) = @client_id", sql)
+        self.assertIn("TRIM(q.customer_id) = @client_id", sql)
         self.assertEqual(
             parameters,
             [
@@ -178,17 +148,12 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
         settings = {
             "BQ_PROJECT_ID": "test-project",
             "BQ_DATASET": "msa_manager",
-            "BQ_QUEUE_DATASET": "msa_dataset",
+            "BQ_QUEUE_DATASET": "msa_manager",
             "BQ_DAILY_QUEUE_TABLE": "msa_daily_queue",
         }
 
         with (
             patch.dict(os.environ, settings, clear=False),
-            patch.object(
-                bigquery,
-                "_queue_partition_field",
-                return_value="processed_at",
-            ),
             patch.object(bigquery, "_execute_dml", return_value=1) as execute,
         ):
             claimed = bigquery.claim_queue_record(
@@ -201,7 +166,7 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
         sql = execute.call_args.args[0]
         self.assertIn("status = 'processing'", sql)
         self.assertNotIn("SET processed_at", sql)
-        self.assertIn("q.`processed_at` >= TIMESTAMP(@as_of)", sql)
+        self.assertIn("DATE(q.processed_at) <= @as_of", sql)
         self.assertIn("IN ('pending', 'queued', 'failed')", sql)
         self.assertNotIn("TIMESTAMP_SUB", sql)
 

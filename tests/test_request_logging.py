@@ -4,6 +4,7 @@ import json
 import logging
 import threading
 import unittest
+from types import SimpleNamespace
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 from unittest.mock import patch
@@ -62,6 +63,139 @@ class RequestLoggingTests(unittest.TestCase):
         self.assertEqual(captured.records[0].path, "/api/companies")
         self.assertNotIn("query detail", json.dumps(payload))
 
+    def test_profile_endpoint_returns_current_user_and_matched_org(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/me",
+            headers={
+                "Cookie": self.auth_cookie(
+                    email="customer@example.com",
+                    role="customer",
+                    company_id="demo_customer",
+                )
+            },
+        )
+
+        with patch.object(
+            app,
+            "load_customer_profiles",
+            return_value={
+                "demo_customer": SimpleNamespace(
+                    company_id="demo_customer",
+                    company_name="Demo Customer",
+                )
+            },
+        ):
+            response = urlopen(request, timeout=5)
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(
+            json.loads(response.read()),
+            {
+                "username": "customer@example.com",
+                "email": "customer@example.com",
+                "role": "customer",
+                "organization": {"id": "demo_customer", "name": "Demo Customer"},
+            },
+        )
+
+    def test_profile_endpoint_refreshes_stale_unmatched_session(self) -> None:
+        cookie = self.auth_cookie(
+            email="aefnoo@broadcam.com",
+            role="customer",
+            company_id=None,
+        )
+        request = Request(
+            f"{self.base_url}/api/me",
+            headers={"Cookie": cookie},
+        )
+
+        with (
+            patch.object(
+                app.users,
+                "resolve_role_company",
+                return_value=("customer", "broadcom"),
+            ) as resolve,
+            patch.object(
+                app,
+                "load_customer_profiles",
+                return_value={
+                    "broadcom": SimpleNamespace(
+                        company_id="broadcom",
+                        company_name="Broadcom",
+                    )
+                },
+            ),
+        ):
+            response = urlopen(request, timeout=5)
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(
+            json.loads(response.read()),
+            {
+                "username": "aefnoo@broadcam.com",
+                "email": "aefnoo@broadcam.com",
+                "role": "customer",
+                "organization": {"id": "broadcom", "name": "Broadcom"},
+            },
+        )
+        resolve.assert_called_once_with("aefnoo@broadcam.com")
+
+    def test_unmatched_customer_feed_is_empty_and_unscoped(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/feed?company=broadcom&service=bigquery",
+            headers={
+                "Cookie": self.auth_cookie(
+                    email="unmatched@example.invalid",
+                    role="customer",
+                    company_id=None,
+                )
+            },
+        )
+
+        with (
+            patch.object(
+                app.users,
+                "resolve_role_company",
+                return_value=("customer", None),
+            ),
+            patch.object(app, "build_feed") as build_feed,
+        ):
+            response = urlopen(request, timeout=5)
+
+        self.assertEqual(response.status, 200)
+        payload = json.loads(response.read())
+        self.assertEqual(payload["count"], 0)
+        self.assertEqual(payload["items"], [])
+        self.assertIsNone(payload["filters"]["company"])
+        self.assertEqual(payload["filters"]["service"], "bigquery")
+        build_feed.assert_not_called()
+
+    def test_unmatched_customer_services_are_empty(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/services",
+            headers={
+                "Cookie": self.auth_cookie(
+                    email="unmatched@example.invalid",
+                    role="customer",
+                    company_id=None,
+                )
+            },
+        )
+
+        with (
+            patch.object(
+                app.users,
+                "resolve_role_company",
+                return_value=("customer", None),
+            ),
+            patch.object(app, "services_payload") as services_payload,
+        ):
+            response = urlopen(request, timeout=5)
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(json.loads(response.read()), {"services": []})
+        services_payload.assert_not_called()
+
     def test_post_exception_is_logged_and_returns_generic_500(self) -> None:
         request = Request(
             f"{self.base_url}/",
@@ -118,6 +252,11 @@ class RequestLoggingTests(unittest.TestCase):
                 "check",
                 return_value=RateLimitDecision(allowed=True),
             ) as rate_limit,
+            patch.object(
+                app.users,
+                "resolve_role_company",
+                return_value=("customer", "demo_customer"),
+            ),
             patch.object(app.JOHN_RUNTIME, "chat", return_value=expected) as chat,
         ):
             response = urlopen(request, timeout=5)
@@ -127,12 +266,55 @@ class RequestLoggingTests(unittest.TestCase):
         rate_limit.assert_called_once_with("203.0.113.10")
         chat.assert_called_once_with(
             message="What affects me?",
-            user_id="browser-user",
+            user_id="customer@example.com",
             session_id="existing-session",
             role="customer",
             company_id="demo_customer",
             principal_email="customer@example.com",
         )
+
+    def test_john_endpoint_does_not_accept_company_from_unmatched_customer(self) -> None:
+        request = Request(
+            f"{self.base_url}/api/john",
+            data=json.dumps(
+                {
+                    "message": "broadcom",
+                    "user_id": "browser-user",
+                    "session_id": "existing-session",
+                }
+            ).encode(),
+            headers={
+                "Cookie": self.auth_cookie(
+                    email="unmatched@example.invalid",
+                    role="customer",
+                    company_id=None,
+                ),
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with (
+            patch.object(
+                app.users,
+                "resolve_role_company",
+                return_value=("customer", None),
+            ),
+            patch.object(app.JOHN_RATE_LIMITER, "check") as rate_limit,
+            patch.object(app.JOHN_RUNTIME, "chat") as chat,
+        ):
+            response = urlopen(request, timeout=5)
+
+        self.assertEqual(response.status, 200)
+        payload = json.loads(response.read())
+        self.assertEqual(payload["session_id"], "existing-session")
+        self.assertEqual(payload["tools"], [])
+        self.assertIn("isn't matched to an organization", payload["reply"])
+        self.assertIn("can't accept a company name in chat", payload["reply"])
+        self.assertNotIn("share the name", payload["reply"].casefold())
+        self.assertNotIn("representing", payload["reply"].casefold())
+        rate_limit.assert_not_called()
+        chat.assert_not_called()
 
     def test_john_endpoint_rejects_an_empty_message(self) -> None:
         request = Request(
@@ -222,6 +404,8 @@ class RequestLoggingTests(unittest.TestCase):
             page = app.html_page()
 
         self.assertIn("window.JOHN_ENABLED = false;", page)
+        self.assertIn('id="profile-email"', page)
+        self.assertIn('id="profile-org"', page)
         john_js = (app.STATIC_DIR / "john.js").read_text(encoding = "utf-8")
         self.assertIn('johnTab.textContent = "John (offline)";', john_js)
 

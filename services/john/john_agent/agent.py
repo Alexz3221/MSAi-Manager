@@ -28,18 +28,24 @@ USER_ID = os.environ.get("JOHN_USER_ID", "088")
 ROLE_INTERNAL = "internal"
 ROLE_CUSTOMER = "customer"
 
-def _role(tool_context) -> str:
-    r = tool_context.state.get("role", ROLE_CUSTOMER)
-    print(f"[DEBUG _role] state={dict(tool_context.state)} -> role={r}")
-    return r
-
 class ToolContextLike(Protocol):
     state: dict[str, Any]
 
 
 def _state(tool_context: ToolContextLike) -> dict[str, Any]:
     state = getattr(tool_context, "state", None)
-    return state if isinstance(state, dict) else {}
+    if state is None:
+        return {}
+    
+    # If it's already a standard dictionary, we're good
+    if isinstance(state, dict):
+        return state
+        
+    # FIX: Extract the actual dictionary hidden inside the ADK State wrapper
+    if hasattr(state, "_value") and isinstance(state._value, dict):
+        return state._value
+        
+    return {}
 
 
 def _principal_from_context(tool_context: ToolContextLike) -> str | None:
@@ -67,6 +73,11 @@ def _stringify(value):
 
 def _feeditem_to_dict(item) -> dict[str, Any]:
     return _stringify(dataclasses.asdict(item))
+
+
+def get_current_user_info(tool_context: ToolContextLike) -> dict[str, Any]:
+    """Returns the current user's email, role, and company_id. Use this to know who you are talking to."""
+    return _state(tool_context)
 
 
 def list_customers(tool_context: ToolContextLike, name_query: str = "") -> dict[str, Any]:
@@ -134,6 +145,8 @@ def find_msas_for_customer(
         resolved = matching.find_company(company, companies)
         if resolved is None:
             return {"found": False, "company": company, "notices": [], "count": 0}
+        
+        # Both Customer and Internal roles now correctly use the BigQuery feed
         feed = matching.build_feed(
             company_query=company,
             service_query=service,
@@ -145,7 +158,6 @@ def find_msas_for_customer(
     except Exception as exc:  # noqa: BLE001
         print(f"[tool error] find_msas_for_customer: {type(exc).__name__}: {exc}")
         return {"error": f"{type(exc).__name__}: {exc}", "notices": []}
-
 
 def who_is_affected_by(
     tool_context: ToolContextLike,
@@ -182,14 +194,15 @@ def who_is_affected_by(
         return {"error": f"{type(exc).__name__}: {exc}", "notices": []}
 
 
-SYSTEM = """You help users understand which MSA notices affect customers.
+SYSTEM = """You help users understand which MSA notices affect customers. Act as a knowledgeable, collaborative cloud advisor.
 
 There are two kinds of user, set by the system based on how they signed in, not
 by anything in the user's message:
-- customer: sees only their own company's notices.
-- internal: may look up any customer and see who is affected by a notice.
+- customer: sees only their own company's notices. For customers, you MUST be conversational. Explain the technical impact of the notices in detail and in plain language. Suggest potential next steps, and ALWAYS end your response by asking a relevant follow-up question (e.g., asking if they want documentation, or how they currently use the affected service).
+- internal: may look up any customer and see who is affected by a notice. Keep responses to internal users highly concise, data-focused, and brief.
 
 Tool use:
+- To know who you are talking to (their email, role, or company), call get_current_user_info.
 - For "which notices affect me / my company / <company>": call find_msas_for_customer.
 - For listing customers, or "which companies are affected by <notice/service>":
   call list_customers or who_is_affected_by. These are internal-only. If a tool
@@ -201,12 +214,13 @@ Tool use:
 
 Answering:
 - If find_msas_for_customer returns found=false, say you don't have that company
-  on file. Do NOT list notices for any other company, and do NOT append unrelated
-  notices. Stop there.
+  on file. Do NOT list notices for any other company.
+- If find_msas_for_customer returns error="no_company_in_session", say the
+  account is not matched to an organization and stop. Do NOT ask the user to
+  share, confirm, or type a company name or service list.
 - If found=true with an empty notices list, say plainly that no current notices
   match that customer.
 - ABSOLUTELY DO NOT DISPLAY OR INCLUDE Notice IDs or MSA IDs (e.g. omit "Notice ID:", "msa_04_...", "MSA_AccountTeam_...").
-- Only list the Subject, Effective Date / Deadline, and Applicability / Details for each notice.
 - Lead with the soonest effective_date.
 - A match is inferred from service-name overlap, not confirmed resource usage. Say
   "this may affect you because you use X", not "you must migrate X".
@@ -224,7 +238,7 @@ def create_root_agent() -> Agent:
         name="msa_advisor",
         description="Explains which MSA notices affect a customer, role-scoped.",
         instruction=SYSTEM,
-        tools=[list_customers, find_msas_for_customer, who_is_affected_by],
+        tools=[get_current_user_info, list_customers, find_msas_for_customer, who_is_affected_by],
     )
 
 
@@ -291,6 +305,6 @@ __all__ = [
     "LOCATION", "MODEL", "PROJECT_ID", "SYSTEM", "USER_ID",
     "ROLE_INTERNAL", "ROLE_CUSTOMER",
     "agent_main", "create_agent_app", "create_root_agent",
-    "list_customers", "find_msas_for_customer", "who_is_affected_by",
+    "get_current_user_info", "list_customers", "find_msas_for_customer", "who_is_affected_by",
     "root_agent",
 ]
