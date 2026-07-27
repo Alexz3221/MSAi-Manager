@@ -77,9 +77,9 @@ def format_for_slack(company, msa_profile, matching_services, summary, actions) 
     url = f"https://msai-manager-1053168925742.europe-west1.run.app/"
     link_display = f"<{url}|Ask John in-app>"
     return (
-        f"Hello {company.company_name} team,\n"
         f"*{verdict}*{deadline}\n"
-        f"This affects your *{services}*\n"
+        f"Hello {company.company_name} team,\n"
+        f"This affects your *{services}* service(s)\n"
         f"{summary}\n"
         f"{action_lines}\n"
         f"{link_display} for a personalized breakdown of what this means for you."
