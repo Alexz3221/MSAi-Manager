@@ -57,6 +57,92 @@ LEGAL_SUFFIXES = {
     "ltd",
     "limited",
 }
+BUSINESS_SUFFIXES = LEGAL_SUFFIXES | {
+    "group",
+    "holding",
+    "holdings",
+    "prod",
+    "pty",
+}
+GENERIC_SINGLE_ALIAS_TOKENS = {
+    "analytics",
+    "cloud",
+    "consulting",
+    "dev",
+    "financial",
+    "finance",
+    "group",
+    "iot",
+    "logistics",
+    "manufacturing",
+    "management",
+    "media",
+    "news",
+    "platform",
+    "prod",
+    "project",
+    "retail",
+    "services",
+    "solutions",
+    "systems",
+    "traders",
+}
+DEMO_DOMAIN_ALIASES = {
+    "afs": "amberline-financial-services",
+    "amberline": "amberline-financial-services",
+    "amberlinefinancial": "amberline-financial-services",
+    "brcm": "broadcom-corporation",
+    "broadcom": "broadcom-corporation",
+    "cloudops": "cloud-ops-alpha",
+    "coa": "cloud-ops-alpha",
+    "cobalt": "cobalt-ridge-manufacturing",
+    "cobaltridge": "cobalt-ridge-manufacturing",
+    "concordance": "concordance-inc",
+    "endeavour": "endeavour-group-limited",
+    "endeavourgroup": "endeavour-group-limited",
+    "entisys": "entisys-solutions-inc",
+    "entisyssolutions": "entisys-solutions-inc",
+    "fairfax": "fairfax-media-management-pty-limited",
+    "fairfaxmedia": "fairfax-media-management-pty-limited",
+    "fmm": "fairfax-media-management-pty-limited",
+    "financeplatform": "finance-platform-prod",
+    "fpp": "finance-platform-prod",
+    "halden": "halden-&-marsh-consulting",
+    "haldenmarsh": "halden-&-marsh-consulting",
+    "hmc": "halden-&-marsh-consulting",
+    "ingram": "ingram-micro-inc",
+    "ingrammicro": "ingram-micro-inc",
+    "nationwide": "nationwide-news-pty-ltd",
+    "nationwidenews": "nationwide-news-pty-ltd",
+    "newscorp": "news-corporate-services-inc",
+    "newscorporate": "news-corporate-services-inc",
+    "northwind": "northwind-traders-llc",
+    "northwindtraders": "northwind-traders-llc",
+    "pinehollow": "pinehollow-retail-corp",
+    "pinehollowretail": "pinehollow-retail-corp",
+    "redshaw": "redshaw-logistics-group",
+    "redshawlogistics": "redshaw-logistics-group",
+    "retailanalytics": "retail-analytics-2026",
+    "sada": "sada-systems-llc",
+    "sadasystems": "sada-systems-llc",
+    "sandbox": "sandbox-project-new",
+    "sandboxproject": "sandbox-project-new",
+    "smartcity": "smartcity-iot-dev",
+    "smartcityiot": "smartcity-iot-dev",
+    "sprinternship": "sprinternship-bld-2026",
+    "sprinternshipbld": "sprinternship-bld-2026",
+    "teg": "teg-pty-ltd",
+    "transurban": "transurban-limited",
+    "trestle": "trestle-and-co-media",
+    "trestlemedia": "trestle-and-co-media",
+    "ttec": "ttec-holdings-inc",
+    "ttecholdings": "ttec-holdings-inc",
+    "vantage": "vantage-point-analytics",
+    "vantageanalytics": "vantage-point-analytics",
+    "vpa": "vantage-point-analytics",
+    "woolies": "woolworths-group-limited",
+    "woolworths": "woolworths-group-limited",
+}
 
 
 @dataclass(frozen=True)
@@ -109,15 +195,55 @@ def _compact(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", value.casefold())
 
 
-def _company_match_candidates(company_id: str, company_name: str) -> set[str]:
-    candidates = {_compact(company_id), _compact(company_name)}
+def _tokens(value: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", value.casefold())
+
+
+def _without_business_suffixes(tokens: list[str]) -> list[str]:
+    stripped = list(tokens)
+    while stripped and stripped[-1] in BUSINESS_SUFFIXES:
+        stripped.pop()
+    return stripped
+
+
+def _generated_company_aliases(company_id: str, company_name: str) -> set[str]:
+    aliases = {_compact(company_id), _compact(company_name)}
     for value in (company_id, company_name):
-        tokens = re.findall(r"[a-z0-9]+", value.casefold())
-        while tokens and tokens[-1] in LEGAL_SUFFIXES:
-            tokens.pop()
-        if tokens:
-            candidates.add("".join(tokens))
-    return {candidate for candidate in candidates if candidate}
+        tokens = _tokens(value)
+        base_tokens = _without_business_suffixes(tokens)
+        for candidate_tokens in (tokens, base_tokens):
+            if not candidate_tokens:
+                continue
+            aliases.add("".join(candidate_tokens))
+            if candidate_tokens[0] not in GENERIC_SINGLE_ALIAS_TOKENS:
+                aliases.add(candidate_tokens[0])
+            if len(candidate_tokens) >= 2:
+                aliases.add("".join(candidate_tokens[:2]))
+                acronym = "".join(token[0] for token in candidate_tokens)
+                if 2 <= len(acronym) <= 6:
+                    aliases.add(acronym)
+    aliases.update(
+        alias
+        for alias, target_id in DEMO_DOMAIN_ALIASES.items()
+        if target_id == company_id
+    )
+    return {alias for alias in aliases if len(alias) >= 3}
+
+
+def _demo_alias_index(companies: dict) -> dict[str, str]:
+    buckets: dict[str, set[str]] = {}
+    for company_id, profile in companies.items():
+        for alias in _generated_company_aliases(company_id, profile.company_name):
+            buckets.setdefault(alias, set()).add(company_id)
+    return {
+        alias: next(iter(company_ids))
+        for alias, company_ids in buckets.items()
+        if len(company_ids) == 1
+    }
+
+
+def _company_match_candidates(company_id: str, company_name: str) -> set[str]:
+    return _generated_company_aliases(company_id, company_name)
 
 
 def _find_company_compact(company_query: str, companies: dict) -> str | None:
@@ -174,6 +300,12 @@ def _find_company_for_domain(domain: str, companies: dict) -> str | None:
             )
             if hit is not None:
                 return hit
+
+    alias_index = _demo_alias_index(companies)
+    for candidate in _domain_candidates(domain):
+        hit = alias_index.get(_compact(candidate))
+        if hit is not None:
+            return hit
 
     for candidate in _domain_candidates(domain):
         hit = matching.find_company(candidate, companies) or _find_company_compact(
