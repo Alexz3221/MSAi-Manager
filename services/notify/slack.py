@@ -9,6 +9,7 @@ from functools import lru_cache
 from google.cloud.sql.connector import Connector
 from msai_core import matching
 from msai_core.matching import MsaProfile, service_terms
+from customer_voice import to_customer_voice
 
 LOGGER = logging.getLogger(__name__)
 
@@ -200,8 +201,11 @@ def send_slack_message(webhook_url, company, msa_profile, matching_services, sum
 
 def notify_channels(msa_profile) -> None:
     raw_text = matching.read_text(msa_profile.raw_msa_path)
-    summary = matching.profile_summary(msa_profile, raw_text)
-    actions = matching.action_items(matching.section_lines(raw_text, "WHAT YOU NEED TO DO"))
+    summary = to_customer_voice(matching.profile_summary(msa_profile, raw_text))
+    actions = [
+        to_customer_voice(a)
+        for a in matching.action_items(matching.section_lines(raw_text, "WHAT YOU NEED TO DO"))
+    ]
     companies = matching.load_customer_profiles()
     webhooks = get_all_slack_webhooks()  
 
