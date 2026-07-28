@@ -21,8 +21,7 @@ from services.web.rate_limit import JohnRateLimiter
 from services.web import users, sessions
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 users.init_db()
-from services.notify.slack import check_table
-check_table()
+
 HOST = "0.0.0.0"
 PORT = int(os.environ.get("PORT", "8080"))
 SERVICE_NAME = os.environ.get("K_SERVICE", "msai-manager")
@@ -656,6 +655,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         return
 
 def main() -> None:
+    from services.notify.slack import check_table
+    check_table()
     server = ThreadingHTTPServer((HOST, PORT), RequestHandler)
     LOGGER.info(
         "MSAi Manager web app started",
