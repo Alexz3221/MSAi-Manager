@@ -234,6 +234,7 @@ prototype advisor rather than durable chat storage.
 | `/api/me` | Signed-in user and matched organization |
 | `/api/services` | Service list |
 | `/api/feed` | Filterable MSA feed |
+| `/api/notice-status` | Set a MSA notice's per-user status (new/in-progress/dismissed) |
 | `/api/company` | Legacy company feed alias |
 | `/api/john` | John chat endpoint |
 | `POST /` | Pub/Sub push webhook for GCS text ingestion |
