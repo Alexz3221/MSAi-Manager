@@ -44,7 +44,7 @@
     function option(value, label) {
       return `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
     }
-
+    const companyFilterGroup = document.querySelector("#company-filter-group");
     async function loadProfile() {
       if (!profileEmail || !profileOrg) return;
       try {
@@ -58,6 +58,9 @@
           profileOrg.textContent = "Internal access";
         } else {
           profileOrg.textContent = "No matched organization";
+        }
+        if (companyFilterGroup){
+          companyFilterGroup.hidden = payload.role !== "internal";
         }
       } catch (error) {
         profileEmail.textContent = "Profile unavailable";
