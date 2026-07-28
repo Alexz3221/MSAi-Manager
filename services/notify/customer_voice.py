@@ -29,16 +29,16 @@ def _capitalize(s: str) -> str:
 
 
 def to_customer_voice(text: str) -> str:
-    #Rewrite TAM-voice MSA text into direct customer-facing phrasing.
-   
+    """Rewrite TAM-voice MSA text into direct customer-facing phrasing."""
     if not text:
         return text
 
     sentences = _SENTENCE_SPLIT_RE.split(text.strip())
-    sentences = [_capitalize(_LEADIN_RE.sub("", s)) for s in sentences]
-    out = " ".join(sentences)
+    out_sentences = []
+    for s in sentences:
+        s = _LEADIN_RE.sub("", s)
+        s = _CUSTOMERS_TO_RE.sub("you to", s)
+        s = _CUSTOMERS_MODAL_RE.sub(lambda m: f"you {m.group(1)}", s)
+        out_sentences.append(_capitalize(s))
 
-    out = _CUSTOMERS_TO_RE.sub("you to", out)
-    out = _CUSTOMERS_MODAL_RE.sub(lambda m: f"you {m.group(1)}", out)
-
-    return _capitalize(out)
+    return " ".join(out_sentences)
