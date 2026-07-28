@@ -28,6 +28,8 @@ def mask_webhook(url: str) -> str:
 
 _IN_MEMORY_WEBHOOKS: dict[str, str] = {}
 
+_IN_MEMORY_NOTIFIED: set[tuple[str, str, str]] = set()
+
 def check_table() -> None:
     if not CLOUD_SQL_PASSWORD:
         LOGGER.info("CLOUD_SQL_PASSWORD not set. Using in-memory store for Slack webhooks.")
@@ -46,10 +48,54 @@ def check_table() -> None:
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS notification_log (
+                msa_id TEXT NOT NULL,
+                company_id TEXT NOT NULL,
+                channel_type TEXT NOT NULL,
+                sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                PRIMARY KEY (msa_id, company_id, channel_type)
+            )
+            """
+        )
         conn.commit()
     finally:
         conn.close()
 
+def already_notified(msa_id: str, company_id: str, channel_type: str) -> bool:
+    if not CLOUD_SQL_PASSWORD:
+        return (msa_id, company_id, channel_type) in _IN_MEMORY_NOTIFIED
+    conn = _get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT 1 FROM notification_log WHERE msa_id = %s AND company_id = %s AND channel_type = %s",
+            (msa_id, company_id, channel_type),
+        )
+        return cursor.fetchone() is not None
+    finally:
+        conn.close()
+
+
+def record_notified(msa_id: str, company_id: str, channel_type: str) -> None:
+    if not CLOUD_SQL_PASSWORD:
+        _IN_MEMORY_NOTIFIED.add((msa_id, company_id, channel_type))
+        return
+    conn = _get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO notification_log (msa_id, company_id, channel_type)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (msa_id, company_id, channel_type) DO NOTHING
+            """,
+            (msa_id, company_id, channel_type),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 def get_slack_webhook(company_id: str) -> str | None:
     if not CLOUD_SQL_PASSWORD:
@@ -216,8 +262,11 @@ def notify_channels(msa_profile) -> None:
         webhook = webhooks.get(company.company_id)
         if webhook is None:
             continue
+        if already_notified(msa_profile.msa_id, company.company_id, "slack"):
+            continue
         try:
             send_slack_message(webhook, company, msa_profile, services, summary, actions)
+            record_notified(msa_profile.msa_id, company.company_id, "slack")
         except Exception:
            LOGGER.exception(
            "Slack notify failed",
