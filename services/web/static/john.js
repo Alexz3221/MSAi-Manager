@@ -6,6 +6,8 @@
     const noticeCount = document.querySelector("#notice-count");
     const companyCount = document.querySelector("#company-count");
     const actionCount = document.querySelector("#action-count");
+    const profileEmail = document.querySelector("#profile-email");
+    const profileOrg = document.querySelector("#profile-org");
     const toolTabs = document.querySelectorAll("[data-tool-target]");
     const johnForm = document.querySelector("#john-form");
     const johnMessage = document.querySelector("#john-message");
@@ -41,6 +43,26 @@
 
     function option(value, label) {
       return `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
+    }
+
+    async function loadProfile() {
+      if (!profileEmail || !profileOrg) return;
+      try {
+        const response = await fetch("/api/me");
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Profile unavailable.");
+        profileEmail.textContent = payload.username || payload.email || "Unknown user";
+        if (payload.organization && payload.organization.name) {
+          profileOrg.textContent = payload.organization.name;
+        } else if (payload.role === "internal") {
+          profileOrg.textContent = "Internal access";
+        } else {
+          profileOrg.textContent = "No matched organization";
+        }
+      } catch (error) {
+        profileEmail.textContent = "Profile unavailable";
+        profileOrg.textContent = "Try signing in again";
+      }
     }
 
     function selectTool(targetId) {
@@ -290,4 +312,5 @@
       });
     });
 
+    loadProfile();
     loadFilters().then(loadFeed);

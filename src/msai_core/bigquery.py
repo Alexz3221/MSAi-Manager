@@ -30,7 +30,7 @@ def bigquery_settings() -> tuple[str, str, str, str]:
 
 def queue_settings() -> tuple[str, str, str]:
     project, _, _, _ = bigquery_settings()
-    dataset = _setting("BQ_QUEUE_DATASET", "msa_dataset")
+    dataset = _setting("BQ_QUEUE_DATASET", "msa_manager")
     table = _setting("BQ_DAILY_QUEUE_TABLE", "msa_daily_queue")
     return project, dataset, table
 
@@ -184,11 +184,9 @@ def load_msa_records() -> list[dict[str, Any]]:
 
 
 def load_pending_queue_records(as_of: date) -> list[dict[str, Any]]:
-    """Load eligible deliveries from exactly one daily queue partition."""
+    """Load eligible deliveries created by the scheduled MSA queue append."""
     project, msa_dataset, _, msa_table = bigquery_settings()
     _, queue_dataset, queue_table = queue_settings()
-    partition_field = _queue_partition_field(project, queue_dataset, queue_table)
-    partition_filter = _queue_partition_filter("q", partition_field)
     available_filter = _queue_available_filter("q")
 
     return _query_records(
@@ -196,10 +194,11 @@ def load_pending_queue_records(as_of: date) -> list[dict[str, Any]]:
         WITH pending_queue AS (
           SELECT
             TRIM(q.msa_id) AS msa_id,
-            TRIM(q.client_id) AS client_id,
-            MAX(q.update_details) AS update_details
+            TRIM(q.customer_id) AS client_id,
+            MAX(q.details) AS update_details,
+            MIN(q.processed_at) AS processed_at
           FROM `{project}.{queue_dataset}.{queue_table}` AS q
-          WHERE {partition_filter}
+          WHERE DATE(q.processed_at) <= @as_of
             AND {available_filter}
           GROUP BY msa_id, client_id
         ),
@@ -263,19 +262,17 @@ def claim_queue_record(
     client_id: str,
     as_of: date,
 ) -> int:
-    """Claim an eligible delivery without changing its partition timestamp."""
+    """Claim an eligible delivery from the scheduled-query queue."""
     project, queue_dataset, queue_table = queue_settings()
-    partition_field = _queue_partition_field(project, queue_dataset, queue_table)
-    partition_filter = _queue_partition_filter("q", partition_field)
     available_filter = _queue_available_filter("q")
 
     return _execute_dml(
         f"""
         UPDATE `{project}.{queue_dataset}.{queue_table}` AS q
         SET status = 'processing'
-        WHERE {partition_filter}
+        WHERE DATE(q.processed_at) <= @as_of
           AND TRIM(q.msa_id) = @msa_id
-          AND TRIM(q.client_id) = @client_id
+          AND TRIM(q.customer_id) = @client_id
           AND {available_filter}
         """,
         [
@@ -293,16 +290,14 @@ def mark_queue_record_sent(
 ) -> int:
     """Mark claimed duplicates for one delivery as sent after SMTP succeeds."""
     project, queue_dataset, queue_table = queue_settings()
-    partition_field = _queue_partition_field(project, queue_dataset, queue_table)
-    partition_filter = _queue_partition_filter("q", partition_field)
 
     return _execute_dml(
         f"""
         UPDATE `{project}.{queue_dataset}.{queue_table}` AS q
         SET status = 'sent'
-        WHERE {partition_filter}
+        WHERE DATE(q.processed_at) <= @as_of
           AND TRIM(q.msa_id) = @msa_id
-          AND TRIM(q.client_id) = @client_id
+          AND TRIM(q.customer_id) = @client_id
           AND LOWER(TRIM(q.status)) = 'processing'
         """,
         [
@@ -320,16 +315,14 @@ def mark_queue_record_failed(
 ) -> int:
     """Release a claimed delivery for retry after an SMTP failure."""
     project, queue_dataset, queue_table = queue_settings()
-    partition_field = _queue_partition_field(project, queue_dataset, queue_table)
-    partition_filter = _queue_partition_filter("q", partition_field)
 
     return _execute_dml(
         f"""
         UPDATE `{project}.{queue_dataset}.{queue_table}` AS q
         SET status = 'failed'
-        WHERE {partition_filter}
+        WHERE DATE(q.processed_at) <= @as_of
           AND TRIM(q.msa_id) = @msa_id
-          AND TRIM(q.client_id) = @client_id
+          AND TRIM(q.customer_id) = @client_id
           AND LOWER(TRIM(q.status)) = 'processing'
         """,
         [

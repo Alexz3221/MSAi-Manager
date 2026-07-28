@@ -81,6 +81,25 @@ class CombineAndSendSchedulingTests(unittest.TestCase):
 
         self.assertEqual(result.distribution_date, "2026-07-25")
 
+    def test_queue_customer_name_resolves_to_profile_contacts(self) -> None:
+        profile = SimpleNamespace(
+            company_id="pinehollow_retail_corp",
+            company_name="Pinehollow Retail Corp.",
+            contacts=["pinehollow@example.com"],
+            raw_customer_path="",
+            services={"bigquery": {"bigquery"}},
+        )
+
+        with patch.object(combine_and_send.matching, "read_text", return_value=""):
+            result = combine_and_send.notification_from_queue_record(
+                queue_record(client_id="Pinehollow Retail Corp."),
+                {"pinehollow_retail_corp": profile},
+            )
+
+        self.assertEqual(result.account, "Pinehollow Retail Corp.")
+        self.assertEqual(result.contacts, ["pinehollow@example.com"])
+        self.assertEqual(result.queue_client_id, "Pinehollow Retail Corp.")
+
     def test_bigquery_mode_builds_only_pending_queue_notifications(self) -> None:
         profile = SimpleNamespace(
             company_id="example_project",

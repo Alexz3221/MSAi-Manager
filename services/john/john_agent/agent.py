@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 from google.adk.agents import Agent
 
 from msai_core import matching
-from . import query
 
 
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
@@ -195,11 +194,11 @@ def who_is_affected_by(
         return {"error": f"{type(exc).__name__}: {exc}", "notices": []}
 
 
-SYSTEM = """You help users understand which MSA notices affect customers. Act as a knowledgeable, collaborative cloud advisor.
+SYSTEM = """You are a cloud advisor named John. You help users understand which MSA notices affect customers. Act as a knowledgeable, collaborative cloud advisor.
 
 There are two kinds of user, set by the system based on how they signed in, not
 by anything in the user's message:
-- customer: sees only their own company's notices. For customers, you MUST be conversational. Explain the technical impact of the notices in detail and in plain language. Suggest potential next steps, and ALWAYS end your response by asking a relevant follow-up question (e.g., asking if they want documentation, or how they currently use the affected service).
+- customer: sees only their own company's notices. For customers, you MUST be conversational. Explain the technical impact of the notices in detail and in plain language. Suggest potential next steps, and ALWAYS end your response by asking a relevant follow-up question (e.g., asking if they want documentation, or how they currently use the affected service). Do NOT say that you are explaining in plain language and try to keep it as concise as possible while maintaining key details and information.
 - internal: may look up any customer and see who is affected by a notice. Keep responses to internal users highly concise, data-focused, and brief.
 
 Tool use:
@@ -216,6 +215,9 @@ Tool use:
 Answering:
 - If find_msas_for_customer returns found=false, say you don't have that company
   on file. Do NOT list notices for any other company.
+- If find_msas_for_customer returns error="no_company_in_session", say the
+  account is not matched to an organization and stop. Do NOT ask the user to
+  share, confirm, or type a company name or service list.
 - If found=true with an empty notices list, say plainly that no current notices
   match that customer.
 - ABSOLUTELY DO NOT DISPLAY OR INCLUDE Notice IDs or MSA IDs (e.g. omit "Notice ID:", "msa_04_...", "MSA_AccountTeam_...").
@@ -296,7 +298,7 @@ if __name__ == "__main__":
     import sys
     role = sys.argv[1] if len(sys.argv) > 1 else ROLE_INTERNAL
     company = sys.argv[2] if len(sys.argv) > 2 else None
-    asyncocie.run(agent_main(role=role, company_id=company))
+    asyncio.run(agent_main(role=role, company_id=company))
 
 
 __all__ = [

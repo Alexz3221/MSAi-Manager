@@ -14,6 +14,7 @@ JSON API endpoints, and the John conversational advisor.
 - Customer and MSA profiles are stored in BigQuery.
 - Raw MSA text and customer-profile exports live in Cloud Storage.
 - Pub/Sub triggers the current MSA/customer ingestion path.
+- Cloud Scheduler runs the customer pull and queue consumer Cloud Run Jobs.
 - John calls Gemini through Vertex AI and keeps temporary in-memory sessions.
 - Logs are written as structured JSON for Cloud Logging.
 
@@ -22,8 +23,55 @@ Primary BigQuery tables:
 ```text
 sprinternship-bld-2026.msa_manager.customer_profiles
 sprinternship-bld-2026.msa_manager.msa_updates
-sprinternship-bld-2026.msa_dataset.msa_daily_queue
+sprinternship-bld-2026.msa_manager.msa_daily_queue
 ```
+
+## Data Pipeline
+
+Customer data follows this path:
+
+```text
+Cloud Scheduler (17:00 UTC)
+  -> msai-manager-pull-user-data Cloud Run Job
+  -> customer export in Cloud Storage
+  -> Pub/Sub notification
+  -> scripts.asset_checker
+  -> msa_manager.customer_profiles
+```
+
+MSA data follows this path:
+
+```text
+raw MSA text in Cloud Storage
+  -> Pub/Sub notification
+  -> scripts.msa_keyword_extractor
+  -> msa_manager.msa_updates
+```
+
+The browser feed and John both match `customer_profiles` directly against
+`msa_updates`. The BigQuery scheduled query `msa_daily_queue_append` appends due
+deliveries from `msa_manager.v_msa_daily_queue` into
+`msa_manager.msa_daily_queue` at 00:00 UTC. Cloud Scheduler runs
+`msai-manager-combine-and-send` at 18:00 UTC with `--send --consume-queue`.
+The older `msa_daily_queue_append_canonical` scheduled query still exists, but
+is disabled and is not used by the app.
+
+## Demo Auth
+
+Users register or log in with an email address. The app derives role and company
+server-side from the email domain:
+
+- `google.com` is treated as internal.
+- Customer domains are matched against `customer_profiles`.
+- Demo matching accepts generated aliases, curated aliases for the current demo
+  customer list, legal/business-suffix-stripped names, and high-confidence fuzzy
+  matches.
+- Active browser sessions refresh their derived company match on authenticated
+  requests.
+- Customer users without a matched company get an empty feed and service list.
+- John does not accept chat-supplied company names as a substitute for a matched
+  session company.
+- Email ownership is not verified, so this is demo scoping, not production auth.
 
 ## Repository Guide
 
@@ -81,16 +129,26 @@ Important settings:
 ```text
 DATA_SOURCE=bigquery
 GOOGLE_CLOUD_PROJECT=sprinternship-bld-2026
+GOOGLE_CLOUD_LOCATION=global
+GOOGLE_GENAI_USE_VERTEXAI=TRUE
+BQ_PROJECT_ID=sprinternship-bld-2026
 BQ_DATASET=msa_manager
 BQ_CUSTOMERS_TABLE=customer_profiles
+BQ_CUSTOMERS_STAGING_TABLE=customer_profiles_staging
 BQ_MSA_UPDATES_TABLE=msa_updates
-BQ_QUEUE_DATASET=msa_dataset
+BQ_QUEUE_DATASET=msa_manager
 BQ_DAILY_QUEUE_TABLE=msa_daily_queue
 MSA_DATA_BUCKET=
 CUSTOMER_DATA_BUCKET=
 JOHN_ENABLED=true
 JOHN_RATE_LIMIT_PER_CLIENT=25
+JOHN_RATE_LIMIT_CLIENT_WINDOW_SECONDS=300
 JOHN_RATE_LIMIT_GLOBAL=300
+JOHN_RATE_LIMIT_GLOBAL_WINDOW_SECONDS=3600
+CUSTOMER_DOMAIN_ALIASES=
+CUSTOMER_DOMAIN_FUZZY_MIN_SCORE=0.82
+CUSTOMER_DOMAIN_FUZZY_MIN_MARGIN=0.08
+CUSTOMER_DOMAIN_FUZZY_MIN_QUERY_LENGTH=8
 LOG_LEVEL=INFO
 ```
 
@@ -168,15 +226,22 @@ prototype advisor rather than durable chat storage.
 | --- | --- |
 | `/` | Browser feed and John UI |
 | `/health` | Basic health check |
+| `/login` | Login/register page |
+| `/api/login` | Login |
+| `/api/register` | Register |
+| `/api/logout` | Logout |
 | `/api/companies` | Customer list |
+| `/api/me` | Signed-in user and matched organization |
 | `/api/services` | Service list |
 | `/api/feed` | Filterable MSA feed |
+| `/api/company` | Legacy company feed alias |
 | `/api/john` | John chat endpoint |
+| `POST /` | Pub/Sub push webhook for GCS text ingestion |
 
 Example feed filter:
 
 ```text
-/api/feed?company=apple&service=bigquery&requires_action=true
+/api/feed?company=vantage-point-analytics&service=bigquery&requires_action=true
 ```
 
 ## Tests

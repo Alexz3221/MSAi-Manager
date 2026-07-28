@@ -160,6 +160,41 @@ def feed_item_payload(item) -> dict[str, object]:
         "raw_msa_path": str(item.raw_msa_path),
     }
 
+def feed_filters(
+    query: dict[str, list[str]],
+    company: str | None,
+    user_email: str | None = None
+) -> dict[str, object]:
+    return {
+        "company": company,
+        "service": query.get("service", [""])[0].strip() or None,
+        "effective_from": query.get("effective_from", [""])[0].strip() or None,
+        "effective_to": query.get("effective_to", [""])[0].strip() or None,
+        "requires_action": bool_param(query.get("requires_action", [""])[0]),
+    }
+
+def empty_feed_payload(
+    query: dict[str, list[str]],
+    company: str | None = None,
+) -> dict[str, object]:
+    return {
+        "filters": feed_filters(query, company),
+        "count": 0,
+        "items": [],
+    }
+
+def unmatched_customer_john_payload(session_id: str | None) -> dict[str, object]:
+    return {
+        "session_id": session_id,
+        "reply": (
+            "I can't look up customer-specific MSA notices because this account "
+            "isn't matched to an organization. I can't accept a company name in "
+            "chat for access; please sign in with a demo email domain that "
+            "matches an organization or ask an administrator to link the account."
+        ),
+        "tools": [],
+    }
+
 def feed_payload(query: dict[str, list[str]], force_company: str | None = None, user_email: str | None = None) -> dict[str, object]:
     if force_company is not None:
         company = force_company
@@ -173,12 +208,13 @@ def feed_payload(query: dict[str, list[str]], force_company: str | None = None, 
 
     status_filter = query.get("status", ["all"])[0].strip().lower() or "all"
 
+    filters = feed_filters(query, company)
     feed = build_feed(
-        company_query=company,
-        service_query=service,
-        requires_action=requires_action,
-        effective_from=effective_from,
-        effective_to=effective_to,
+        company_query=filters["company"],
+        service_query=filters["service"],
+        requires_action=filters["requires_action"],
+        effective_from=filters["effective_from"],
+        effective_to=filters["effective_to"],
     )
 
     user_statuses = users.get_user_notice_statuses(user_email) if user_email else {}
@@ -202,6 +238,7 @@ def feed_payload(query: dict[str, list[str]], force_company: str | None = None, 
             "requires_action": requires_action,
             "status": status_filter,
         },
+        "filters": filters,
         "count": len(processed_items),
         "items": processed_items,
     }
@@ -215,6 +252,37 @@ def companies_payload(role: str = "internal") -> dict[str, object]:
             for profile in load_customer_profiles().values()
         ]
     }
+
+def profile_payload(sess: dict) -> dict[str, object]:
+    email = str(sess.get("email") or "")
+    role = str(sess.get("role") or "customer")
+    company_id = str(sess.get("company_id") or "").strip() or None
+    organization = None
+    if company_id:
+        profile = load_customer_profiles().get(company_id)
+        organization = {
+            "id": company_id,
+            "name": profile.company_name if profile else company_id,
+        }
+    return {
+        "username": email,
+        "email": email,
+        "role": role,
+        "organization": organization,
+    }
+
+def refresh_session_scope(sess: dict) -> dict:
+    email = str(sess.get("email") or "").strip()
+    if not email:
+        return sess
+    role, company_id = users.resolve_role_company(email)
+    current_company_id = sess.get("company_id")
+    sess["role"] = role
+    if role == "internal":
+        sess["company_id"] = None
+    elif company_id is not None or current_company_id is None:
+        sess["company_id"] = company_id
+    return sess
 
 def services_payload() -> dict[str, object]:
     services = set()
@@ -339,18 +407,28 @@ class RequestHandler(BaseHTTPRequestHandler):
         if sess is None:
             self.redirect("/login")
             return
+        sess = refresh_session_scope(sess)
         role = sess.get("role", "customer")
         company_id = sess.get("company_id")
         if parsed_url.path == "/":
             self.send_html(html_page())
             return
+        if parsed_url.path == "/api/me":
+            self.send_json(200, profile_payload(sess))
+            return
         if parsed_url.path == "/api/companies":
             self.send_json(200, companies_payload(role))
             return
         if parsed_url.path == "/api/services":
+            if role == "customer" and not company_id:
+                self.send_json(200, {"services": []})
+                return
             self.send_json(200, services_payload())
             return
         if parsed_url.path in {"/api/feed", "/api/company"}:
+            if role == "customer" and not company_id:
+                self.send_json(200, empty_feed_payload(query))
+                return
             force = company_id if role == "customer" else None
             if role != "customer" and parsed_url.path == "/api/company" and "company" not in query:
                 name = query.get("name", [""])[0]
@@ -432,6 +510,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             if sess is None:
                 self.send_json(401, {"error": "Not authenticated."})
                 return
+            sess = refresh_session_scope(sess)
             try:
                 content_length = int(self.headers.get("Content-Length", 0))
                 if content_length <= 0 or content_length > 16_384:
@@ -456,6 +535,9 @@ class RequestHandler(BaseHTTPRequestHandler):
                     raise ValueError("User ID must be between 1 and 128 characters.")
                 if session_id and len(session_id) > 128:
                     raise ValueError("Session ID must be 128 characters or fewer.")
+                if sess.get("role", "customer") == "customer" and not sess.get("company_id"):
+                    self.send_json(200, unmatched_customer_john_payload(session_id))
+                    return
                 rate_limit = JOHN_RATE_LIMITER.check(self.client_key())
                 
                 if not rate_limit.allowed:
@@ -533,6 +615,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             from scripts.msa_keyword_extractor import parse_msa_file, write_profile
+            from services.notify.slack import notify_channels, profile_dict_to_msa_profile
             profile = parse_msa_file(bucket_name, blob_name)
             errors = write_profile(profile)
             if errors:
@@ -547,6 +630,17 @@ class RequestHandler(BaseHTTPRequestHandler):
                 )
                 self.send_json(500, {"error": "Failed to write MSA profile"})
                 return
+        # --- Slack Integration-----------------------
+            try:
+                notify_channels(profile_dict_to_msa_profile(profile))
+            except Exception:
+                LOGGER.exception(
+                    "Failed to send notification",
+                    extra={
+                        **self.log_context("POST"),
+                        "event": "notification_failed",
+                    },
+                )
             self.send_response(204)
             self.end_headers()
         except Exception:

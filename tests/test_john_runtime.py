@@ -42,9 +42,9 @@ class JohnRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(first["session_id"], "generated-session")
-        self.assertEqual(first["reply"], "Answer for first question")
+        self.assertTrue(first["reply"].endswith("first question"))
         self.assertEqual(first["tools"], ["find_msas_for_customer"])
-        self.assertEqual(second["reply"], "Answer for follow-up")
+        self.assertTrue(second["reply"].endswith("follow-up"))
         self.assertEqual(len(app.created_sessions), 1)
 
 
