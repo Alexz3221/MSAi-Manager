@@ -91,7 +91,6 @@
 }
 
     .user-profile-header {
-      margin-left: auto;
       display: flex;
       align-items: center;
       gap: 12px;
