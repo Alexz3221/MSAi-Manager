@@ -239,7 +239,12 @@
     });
 
     toolTabs.forEach(tab => {
-      tab.addEventListener("click", () => selectTool(tab.dataset.toolTarget));
+      tab.addEventListener("click", () => {
+        selectTool(tab.dataset.toolTarget);
+        if (tab.dataset.toolTarget === "settings-tool" && window.initSlackSettings) {
+          window.initSlackSettings();
+        }
+      });
     });
 
     johnForm.addEventListener("submit", event => {
