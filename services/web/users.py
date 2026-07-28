@@ -175,7 +175,35 @@ def init_db() -> None:
                 created_at     TEXT NOT NULL
             )
         """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS user_notice_statuses (
+                user_email      TEXT NOT NULL,
+                notice_id       TEXT NOT NULL,
+                status          TEXT NOT NULL CHECK (status IN ('new', 'in-progress', 'dismissed')),
+                updated_at      TEXT NOT NULL,
+                PRIMARY KEY (user_email, notice_id),
+                FOREIGN KEY (user_email) REFERENCES users(email)
+            )
+        """)
 
+def get_user_notice_statuses(user_email: str) -> dict[str, str]:
+    with _conn() as con:
+        rows = con.execute(
+            "SELECT notice_id, status FROM user_notice_statuses WHERE user_email = ?",
+            (user_email,)
+        ).fetchall()
+        return {row["notice_id"]: row["status"] for row in rows}
+
+def set_user_notice_status(user_email: str, notice_id: str, status: str) -> None:
+    now = dt.datetime.utcnow().isoformat()
+    with _conn() as con:
+        con.execute("""
+            INSERT INTO user_notice_statuses (user_email, notice_id, status, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_email, notice_id) DO UPDATE SET
+                status = excluded.status,
+                updated_at = excluded.updated_at
+        """, (user_email, notice_id, status, now))
 
 def _domain(email: str) -> str:
     return email.rsplit("@", 1)[-1].lower() if "@" in email else ""

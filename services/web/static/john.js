@@ -17,6 +17,7 @@
     const chatLog = document.querySelector("#chat-log");
     const johnUserId = `web-${crypto.randomUUID ? crypto.randomUUID() : Date.now()}`;
     let johnSessionId = null;
+    let currentStatusFilter = "all";
 
     if (!johnEnabled) {
       johnTab.disabled = true;
@@ -155,6 +156,9 @@
       if (document.querySelector("#requires_action").checked) {
         params.set("requires_action", "true");
       }
+      if (currentStatusFilter && currentStatusFilter !== "all") {
+        params.set("status", currentStatusFilter);
+      }
       return params;
     }
 
@@ -174,6 +178,31 @@
         const rest = (subject || "").slice(match[0].length);
         return `<span class="status-tag">${escapeHtml(tag)}:</span> ${escapeHtml(rest)}`;
       }
+
+    function attachNoticeStatusListeners() {
+      document.querySelectorAll(".notice-status-select").forEach(select => {
+        select.addEventListener("change", async (e) => {
+          const noticeId = e.target.dataset.id;
+          const status = e.target.value;
+
+          try{
+            const response = await fetch("/api/notice-status", {
+              method: "POST",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({notice_id: noticeId, status})
+            });
+            if (response.ok) {
+              e.target.className = `notice-status-select status-${status}`;
+              if(currentStatusFilter !== "all"){
+                loadFeed();
+              }
+            }
+          } catch (err) {
+            console.error("Failed to update status:", err);
+          }
+        });
+      });
+    }
 
     function renderFeed(payload) {
       const impacted = new Set();
@@ -214,17 +243,29 @@
           .join("");
 
         const statusClass = statusFromSubject(item.subject);
+        const itemStatus = item.status || "new";
+        const itemId = item.msa_id || item.id || item.subject;
 
         return `
-          <article class="feed-card ${statusClass}">
+          <article class="feed-card ${statusClass}" data-notice-id="${escapeHtml(item.msa_id)}" >
             <h2><span class="status-dot"></span>${formatSubject(item.subject)}</h2>
             <p><strong>Effective:</strong> ${escapeHtml(item.effective_date || "Not listed")}</p>
             <div class="pills">${services}</div>
             <div class="pills">${companies}</div>
             ${actions ? `<ul>${actions}</ul>` : ""}
+
+            <div class="card-status-actions">
+              <label>Status:</label>
+              <select class="notice-status-select status-${itemStatus}" data-id="${escapeHtml(item.msa_id)}">
+                <option value="new" ${itemStatus === "new" ? "selected" : ""}>New</option>
+                <option value="in-progress" ${itemStatus === "in-progress" ? "selected" : ""}>In Progress</option>
+                <option value="dismissed" ${itemStatus === "dismissed" ? "selected" : ""}>Dismissed</option>
+              </select>
+            </div>
           </article>
         `;
       }).join("");
+      attachNoticeStatusListeners();
     }
 
     async function loadFeed() {
@@ -259,6 +300,20 @@
       button.addEventListener("click", () => {
         johnMessage.value = button.dataset.prompt;
         johnForm.requestSubmit();
+      });
+    });
+
+    document.querySelectorAll("#status-filter-tabs .filter-tab").forEach(tab => {
+      tab.setAttribute("type", "button");
+
+      tab.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        document.querySelectorAll("#status-filter-tabs .filter-tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        currentStatusFilter = tab.dataset.filter || "all";
+        loadFeed();
       });
     });
 

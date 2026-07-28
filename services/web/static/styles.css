@@ -370,7 +370,92 @@
       padding: 5px 8px;
     }
 
+    .feed-status-buttons {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 4px;
+      width: fit-content;
+      background: var(--card-bg);
+      border-radius: 999px;
+      margin-bottom: 14px;
+    }
 
+    .filter-tab {
+      width: auto;
+      margin: 0;
+      min-height: auto;
+      padding: 7px 16px;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--black);
+      font: 600 13px/1 var(--font-main);
+      opacity: 0.6;
+      transition: background 0.15s ease, opacity 0.15s ease, color 0.15s ease;
+    }
+
+    .filter-tab:hover {
+      filter: none;
+      opacity: 0.85;
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    .filter-tab.active {
+      background: var(--white);
+      color: var(--blue);
+      opacity: 1;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    }
+
+    .card-status-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 14px 0 0;
+    }
+
+    .card-status-actions label {
+      margin: 0;
+      font: 600 11px/1 var(--font-main);
+      letter-spacing: 0.04em;
+      color: rgba(0, 0, 0, 0.55);
+    }
+
+    .notice-status-select {
+      appearance: none;
+      -webkit-appearance: none;
+      width: auto;
+      min-height: auto;
+      background-color: var(--white);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 9px;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      border-left: 3px solid var(--blue);
+      border-radius: 999px;
+      color: var(--black);
+      cursor: pointer;
+      font: 600 12px/1 var(--font-main);
+      padding: 6px 26px 6px 12px;
+    }
+
+    .notice-status-select:hover {
+      border-color: rgba(0, 0, 0, 0.3);
+      border-left-color: var(--blue);
+    }
+
+    .notice-status-select:focus {
+      outline: 2px solid var(--blue);
+      outline-offset: 1px;
+    }
+
+    .notice-status-select.status-new { border-left-color: var(--blue); }
+    .notice-status-select.status-in-progress { border-left-color: var(--yellow); }
+    .notice-status-select.status-dismissed {
+      border-left-color: #9a9a9a;
+      color: rgba(0, 0, 0, 0.55);
+    }
 
     .stats-panel {
       display: flex;
