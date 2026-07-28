@@ -9,7 +9,7 @@ from functools import lru_cache
 from google.cloud.sql.connector import Connector
 from msai_core import matching
 from msai_core.matching import MsaProfile, service_terms
-from customer_voice import to_customer_voice
+from .customer_voice import to_customer_voice
 
 LOGGER = logging.getLogger(__name__)
 
