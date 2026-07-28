@@ -67,6 +67,7 @@
       gap: 24px;
       padding: 0;
       align-items: center;
+      margin-left: auto;
     }
 
 /* Makes the header a flex container to align items side-by-side */
@@ -660,6 +661,9 @@
           flex-direction: column;
             gap: 16px;
         }
+        .tool-nav {
+            margin-left: 0;
+        }  
         .user-profile-header {
             margin-left: 0;
             align-self: flex-start;
