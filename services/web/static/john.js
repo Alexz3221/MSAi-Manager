@@ -170,6 +170,7 @@
               body: JSON.stringify({notice_id: noticeId, status})
             });
             if (response.ok) {
+              e.target.className = `notice-status-select status-${status}`;
               if(currentStatusFilter !== "all"){
                 loadFeed();
               }
@@ -233,7 +234,7 @@
 
             <div class="card-status-actions">
               <label>Status:</label>
-              <select class="notice-status-select" data-id="${escapeHtml(item.msa_id)}">
+              <select class="notice-status-select status-${itemStatus}" data-id="${escapeHtml(item.msa_id)}">
                 <option value="new" ${itemStatus === "new" ? "selected" : ""}>New</option>
                 <option value="in-progress" ${itemStatus === "in-progress" ? "selected" : ""}>In Progress</option>
                 <option value="dismissed" ${itemStatus === "dismissed" ? "selected" : ""}>Dismissed</option>
