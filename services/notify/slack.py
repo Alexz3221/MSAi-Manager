@@ -161,7 +161,7 @@ def format_for_slack(company, msa_profile, matching_services, summary, actions) 
     return (
         f"*{verdict}*{deadline}\n"
         f"Hello {company.company_name} team,\n"
-        f"This affects your *{services}* service(s)\n"
+        f"Here's what's changing and how it affects your *{services}* service\n"
         f"{summary}\n"
         f"{action_lines}\n"
         f"{link_display} for a personalized breakdown of what this means for you."
