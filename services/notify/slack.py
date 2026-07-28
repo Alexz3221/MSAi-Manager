@@ -25,8 +25,12 @@ def is_valid_slack_webhook(url: str) -> bool:
 def mask_webhook(url: str) -> str:
     return f"…{url[-8:]}" if len(url) > 8 else "…"
 
+_IN_MEMORY_WEBHOOKS: dict[str, str] = {}
 
 def check_table() -> None:
+    if not CLOUD_SQL_PASSWORD:
+        LOGGER.info("CLOUD_SQL_PASSWORD not set. Using in-memory store for Slack webhooks.")
+        return
     conn = _get_connection()
     try:
         cursor = conn.cursor()
@@ -47,6 +51,8 @@ def check_table() -> None:
 
 
 def get_slack_webhook(company_id: str) -> str | None:
+    if not CLOUD_SQL_PASSWORD:
+        return _IN_MEMORY_WEBHOOKS.get(company_id)
     conn = _get_connection()
     try:
         cursor = conn.cursor()
@@ -62,6 +68,9 @@ def get_slack_webhook(company_id: str) -> str | None:
 
 
 def upsert_slack_webhook(company_id: str, webhook_url: str) -> None:
+    if not CLOUD_SQL_PASSWORD:
+        _IN_MEMORY_WEBHOOKS[company_id] = webhook_url
+        return
     conn = _get_connection()
     try:
         cursor = conn.cursor()
@@ -80,6 +89,9 @@ def upsert_slack_webhook(company_id: str, webhook_url: str) -> None:
 
 
 def delete_slack_webhook(company_id: str) -> None:
+    if not CLOUD_SQL_PASSWORD:
+        _IN_MEMORY_WEBHOOKS.pop(company_id, None)
+        return
     conn = _get_connection()
     try:
         cursor = conn.cursor()
@@ -139,6 +151,8 @@ def _get_connection():
 
 #webhook helper 
 def get_all_slack_webhooks() -> dict[str, str]:
+    if not CLOUD_SQL_PASSWORD:
+        return _IN_MEMORY_WEBHOOKS.copy()
     conn = _get_connection()
     try:
         cursor = conn.cursor()
