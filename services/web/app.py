@@ -160,15 +160,19 @@ def feed_item_payload(item) -> dict[str, object]:
         "raw_msa_path": str(item.raw_msa_path),
     }
 
-def feed_payload(query: dict[str, list[str]], force_company: str | None = None) -> dict[str, object]:
+def feed_payload(query: dict[str, list[str]], force_company: str | None = None, user_email: str | None = None) -> dict[str, object]:
     if force_company is not None:
         company = force_company
     else:
         company = query.get("company", [""])[0].strip() or None
+
     service = query.get("service", [""])[0].strip() or None
     effective_from = query.get("effective_from", [""])[0].strip() or None
     effective_to = query.get("effective_to", [""])[0].strip() or None
     requires_action = bool_param(query.get("requires_action", [""])[0])
+
+    status_filter = query.get("status", ["all"])[0].strip().lower() or "all"
+
     feed = build_feed(
         company_query=company,
         service_query=service,
@@ -176,6 +180,19 @@ def feed_payload(query: dict[str, list[str]], force_company: str | None = None) 
         effective_from=effective_from,
         effective_to=effective_to,
     )
+
+    user_statuses = users.get_user_notice_statuses(user_email) if user_email else {}
+
+    processed_items = []
+    for item in feed:
+        item_dict = feed_item_payload(item)
+        notice_id = str(item_dict.get("msa_id") or item_dict.get("id") or item_dict.get("subject", ""))
+        item_status = user_statuses.get(notice_id, "new")
+        item_dict["status"] = item_status
+
+        if status_filter == "all" or item_status == status_filter:
+            processed_items.append(item_dict)
+
     return {
         "filters": {
             "company": company,
@@ -183,9 +200,10 @@ def feed_payload(query: dict[str, list[str]], force_company: str | None = None) 
             "effective_from": effective_from,
             "effective_to": effective_to,
             "requires_action": requires_action,
+            "status": status_filter,
         },
-        "count": len(feed),
-        "items": [feed_item_payload(item) for item in feed],
+        "count": len(processed_items),
+        "items": processed_items,
     }
 
 def companies_payload(role: str = "internal") -> dict[str, object]:
@@ -338,12 +356,37 @@ class RequestHandler(BaseHTTPRequestHandler):
                 name = query.get("name", [""])[0]
                 if name:
                     query["company"] = [name]
-            self.send_json(200, feed_payload(query, force_company=force))
+            user_email = sess.get("email")        
+            self.send_json(200, feed_payload(query, force_company=force, user_email=user_email))
             return
         self.send_json(404, {"error": "Not found"})
 
     def do_POST(self) -> None:
         parsed_url = urlparse(self.path)
+        # User Status Update
+        if parsed_url.path == "/api/notice-status":
+            sess = self.session()
+            if sess is None:
+                self.send_json(401, {"error": "Unauthorized"})
+                return
+
+            body = self.read_json_body()
+            if not body:
+                self.send_json(400, {"error": "Invalid request body"})
+                return
+
+            notice_id = body.get("notice_id")
+            status = body.get("status")
+
+            if not notice_id or status not in {"new", "in-progress", "dismissed"}:
+                self.send_json(400, {"error": "Invalid notice_id or status"})
+                return
+
+            user_email = sess.get("email")
+            users.set_user_notice_status(user_email, notice_id, status)
+            self.send_json(200, {"success": True, "notice_id": notice_id, "status": status})
+            return
+        
         if parsed_url.path == "/api/register":
             body = self.read_json_body()
             if body is None:
