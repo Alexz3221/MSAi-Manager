@@ -1,5 +1,7 @@
 import re
 
+#transforms TAM-voice MSA text into direct customer-facing phrasing.
+
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
 

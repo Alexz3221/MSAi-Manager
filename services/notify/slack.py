@@ -165,7 +165,7 @@ def get_all_slack_webhooks() -> dict[str, str]:
         conn.close()
 
 
-
+ 
 def format_for_slack(company, msa_profile, matching_services, summary, actions) -> str:
     verdict = "🔴 ACTION REQUIRED" if msa_profile.requires_customer_action else "🔵 NEW MSA"
     services = ", ".join(matching_services)
