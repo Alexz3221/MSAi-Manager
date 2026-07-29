@@ -23,7 +23,7 @@
       <nav class="tool-nav" aria-label="Tools">
         <button class="tool-tab active" type="button" data-tool-target="feed-tool" aria-selected="true">Feed</button>
         <button class="tool-tab" id="john-tab" type="button" data-tool-target="john-tool" aria-selected="false">John</button>
-        <button class="tool-tab" id="settings-tab" type="button" data-tool-target="settings-tool" aria-selected="false">Slack</button>
+        <button class="tool-tab" id="settings-tab" type="button" data-tool-target="settings-tool" aria-selected="false">Notifications</button>
       </nav>
       <div class="user-profile-header">
         <div class="profile-avatar">
@@ -155,6 +155,23 @@
           <button type="button" id="slack-remove">Remove</button>
         </div>
       </div>
+      <div class="panel" style="max-width: 480px;">
+        <h2>Google Chat notifications</h2>
+        <p class="subtitle" id="gchat-status">Checking configuration…</p>
+
+        <div id="gchat-company-picker" hidden>
+          <label for="gchat-company">Company</label>
+          <select id="gchat-company"></select>
+        </div>
+
+        <label for="gchat-webhook">Incoming webhook URL</label>
+        <input id="gchat-webhook" type="url" placeholder="https://chat.googleapis.com/v1/spaces/...">
+
+        <div style="display:flex; gap:8px; margin-top:12px;">
+          <button type="button" id="gchat-save">Save</button>
+          <button type="button" id="gchat-remove">Remove</button>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -167,6 +184,7 @@ function logout() {
 
 <script>window.JOHN_ENABLED = __JOHN_ENABLED__;</script>
 <script src="/static/john.js" ></script>
-<script src="/static/settings.js"></script>
+<script src="/static/slack.js"></script>
+<script src="/static/gchat.js"></script>
 </body>
 </html>
