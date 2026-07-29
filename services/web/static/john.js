@@ -287,6 +287,7 @@
         selectTool(tab.dataset.toolTarget);
         if (tab.dataset.toolTarget === "settings-tool" && window.initSlackSettings) {
           window.initSlackSettings();
+        if (window.initGchatSettings) window.initGchatSettings();
         }
       });
     });
