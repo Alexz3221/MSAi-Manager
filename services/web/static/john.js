@@ -285,9 +285,9 @@
     toolTabs.forEach(tab => {
       tab.addEventListener("click", () => {
         selectTool(tab.dataset.toolTarget);
-        if (tab.dataset.toolTarget === "settings-tool" && window.initSlackSettings) {
-          window.initSlackSettings();
-        if (window.initGchatSettings) window.initGchatSettings();
+        if (tab.dataset.toolTarget === "settings-tool") {
+          if (window.initSlackSettings) window.initSlackSettings();
+          if (window.initGchatSettings) window.initGchatSettings();
         }
       });
     });
