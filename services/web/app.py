@@ -437,8 +437,12 @@ class RequestHandler(BaseHTTPRequestHandler):
             user_email = sess.get("email")        
             self.send_json(200, feed_payload(query, force_company=force, user_email=user_email))
             return
-        if parsed_url.path == "/api/notifications/slack":
-            from services.notify.slack import get_slack_webhook, mask_webhook
+        if parsed_url.path.startswith("/api/notifications/"):
+            from services.notify.channels import get_webhook, mask_webhook, VALID_CHANNEL_TYPES
+            channel_type = parsed_url.path.removeprefix("/api/notifications/")
+            if channel_type not in VALID_CHANNEL_TYPES:
+                self.send_json(400, {"error": f"Invalid channel type: {channel_type}"})
+                return
             if role == "customer":
                 if not company_id:
                     self.send_json(400, {"error": "Account isn't linked to an organization."})
@@ -449,12 +453,12 @@ class RequestHandler(BaseHTTPRequestHandler):
                 if not target_company:
                     self.send_json(400, {"error": "company_id query parameter is required."})
                     return
-            webhook = get_slack_webhook(target_company)
+            webhook = get_webhook(target_company, channel_type)
             self.send_json(200, {
                 "company_id": target_company,
                 "configured": webhook is not None,
                 "webhook_preview": mask_webhook(webhook) if webhook else None,
-            })
+            })        
             return
         self.send_json(404, {"error": "Not found"})
 
@@ -601,7 +605,12 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.send_json(503, {"error": "John is temporarily unavailable."})
             return
         # --- Slack Integration: requires a session ---------------------------------------
-        if parsed_url.path == "/api/notifications/slack":
+        if parsed_url.path.startswith("/api/notifications/"):
+            from services.notify.channels import VALID_CHANNEL_TYPES, upsert_webhook, delete_webhook
+            channel_type = parsed_url.path.removeprefix("/api/notifications/")
+            if channel_type not in VALID_CHANNEL_TYPES:
+                self.send_json(400, {"error": f"Invalid channel type: {channel_type}"})
+                return
             sess = self.session()
             if sess is None:
                 self.send_json(401, {"error": "Not authenticated."})
@@ -626,17 +635,20 @@ class RequestHandler(BaseHTTPRequestHandler):
                     return
 
             webhook_url = str(body.get("webhook_url", "")).strip()
-            from services.notify.slack import (
-                delete_slack_webhook, is_valid_slack_webhook, upsert_slack_webhook,
-            )
+
             if not webhook_url:
-                delete_slack_webhook(target_company)
+                delete_webhook(target_company, channel_type)
                 self.send_json(200, {"ok": True, "configured": False})
                 return
-            if not is_valid_slack_webhook(webhook_url):
-                self.send_json(400, {"error": "That doesn't look like a Slack incoming webhook URL."})
+            if channel_type == "slack":
+                from services.notify.slack import is_valid_slack_webhook as is_valid
+            else:
+                from services.notify.gchat import is_valid_gchat_webhook as is_valid
+
+            if not is_valid(webhook_url):
+                self.send_json(400, {"error": f"That doesn't look like a valid {channel_type} webhook URL."})
                 return
-            upsert_slack_webhook(target_company, webhook_url)
+            upsert_webhook(target_company, channel_type, webhook_url)
             self.send_json(200, {"ok": True, "configured": True})
             return
 
@@ -674,7 +686,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
             from scripts.msa_keyword_extractor import parse_msa_file, write_profile
-            from services.notify.slack import notify_channels, profile_dict_to_msa_profile
+            from services.notify.dispatch import notify_channels, profile_dict_to_msa_profile
             profile = parse_msa_file(bucket_name, blob_name)
             errors = write_profile(profile)
             if errors:
@@ -710,7 +722,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         return
 
 def main() -> None:
-    from services.notify.slack import check_table
+    from services.notify.channels import check_table
     check_table()
     server = ThreadingHTTPServer((HOST, PORT), RequestHandler)
     LOGGER.info(
