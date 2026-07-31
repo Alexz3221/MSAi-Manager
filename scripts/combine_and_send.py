@@ -245,6 +245,45 @@ def email_subject(notification: Notification) -> str:
     return f"Relevant Google Cloud MSA update: {notification.subject}"
 
 
+def notification_severity(notification: Notification) -> dict[str, str]:
+    subject = notification.subject.lower()
+    if notification.requires_customer_action or "action required" in subject:
+        return {
+            "label": "Action required",
+            "tone": "critical",
+            "accent": "#d93025",
+            "surface": "#fce8e6",
+            "border": "#f4c7c3",
+            "text": "#a50e0e",
+        }
+    if "action advised" in subject:
+        return {
+            "label": "Action advised",
+            "tone": "warning",
+            "accent": "#f9ab00",
+            "surface": "#fef7e0",
+            "border": "#fde293",
+            "text": "#7c4700",
+        }
+    if notification.effective_date:
+        return {
+            "label": "Scheduled change",
+            "tone": "important",
+            "accent": "#1a73e8",
+            "surface": "#e8f0fe",
+            "border": "#d2e3fc",
+            "text": "#174ea6",
+        }
+    return {
+        "label": "Informational",
+        "tone": "info",
+        "accent": "#188038",
+        "surface": "#e6f4ea",
+        "border": "#ceead6",
+        "text": "#0d652d",
+    }
+
+
 def recipient_list(override_recipients: list[str] | None = None) -> list[str]:
     return override_recipients or DEFAULT_TEST_RECIPIENTS
 
@@ -268,6 +307,7 @@ def render_text_email(notification: Notification) -> str:
     actions = "\n".join(f"- {action}" for action in notification.actions)
     if not actions:
         actions = "- Review the linked MSA notice and confirm whether action is needed."
+    severity = notification_severity(notification)["label"]
 
     return f"""Hello {notification.account} team,
 
@@ -276,6 +316,7 @@ We found a Google Cloud MSA notice that appears relevant to services your compan
 MSA notice:
 {notification.subject}
 
+Severity: {severity}
 Notice date: {notification.date}
 Distribution date: {notification.distribution_date or "Not listed"}
 Effective date: {notification.effective_date or "Not listed"}
@@ -300,6 +341,7 @@ def render_html_email(notification: Notification) -> str:
     distribution_date = escape(notification.distribution_date or "Not listed")
     effective_date = escape(notification.effective_date or "Not listed")
     action_required = "Yes" if notification.requires_customer_action else "No"
+    severity = notification_severity(notification)
     services = "".join(
         f"<span class=\"pill\">{escape(service)}</span>"
         for service in notification.matching_services
@@ -319,80 +361,214 @@ def render_html_email(notification: Notification) -> str:
   <style>
     body {{
       margin: 0;
-      background: #eef5f1;
-      color: #17211f;
-      font-family: Georgia, "Times New Roman", serif;
+      background: #f1f3f4;
+      color: #202124;
+      font-family: Arial, Helvetica, sans-serif;
+    }}
+    .wrapper {{
+      padding: 28px 12px;
     }}
     .email {{
       max-width: 720px;
       margin: 0 auto;
-      padding: 28px;
       background: #ffffff;
-      border: 1px solid #d7e1dc;
+      border: 1px solid #dadce0;
+      border-radius: 16px;
+      box-shadow: 0 1px 2px rgba(60, 64, 67, 0.16);
+      overflow: hidden;
+    }}
+    .brand {{
+      align-items: center;
+      border-bottom: 1px solid #e8eaed;
+      display: flex;
+      gap: 10px;
+      padding: 18px 24px;
+    }}
+    .g {{
+      font: 700 22px/1 Arial, Helvetica, sans-serif;
+      letter-spacing: 0;
+    }}
+    .g-blue {{ color: #4285f4; }}
+    .g-red {{ color: #ea4335; }}
+    .g-yellow {{ color: #fbbc04; }}
+    .g-green {{ color: #34a853; }}
+    .brand-text {{
+      color: #3c4043;
+      font-size: 14px;
+      font-weight: 700;
+    }}
+    .hero {{
+      background: {severity["surface"]};
+      border-left: 8px solid {severity["accent"]};
+      padding: 26px 28px 24px;
     }}
     .meta {{
-      color: #65716d;
-      font: 700 12px/1.3 Verdana, sans-serif;
+      color: #5f6368;
+      font: 700 12px/1.3 Arial, Helvetica, sans-serif;
       text-transform: uppercase;
     }}
     h1 {{
-      font-size: 25px;
-      line-height: 1.2;
-      margin: 10px 0 14px;
+      color: #202124;
+      font-size: 26px;
+      line-height: 1.25;
+      margin: 12px 0 14px;
+    }}
+    h2 {{
+      color: #202124;
+      font-size: 16px;
+      line-height: 1.3;
+      margin: 0 0 10px;
     }}
     p, li {{
       font-size: 15px;
-      line-height: 1.55;
+      line-height: 1.6;
+    }}
+    p {{
+      margin: 0 0 12px;
+    }}
+    ul {{
+      margin: 0;
+      padding-left: 20px;
+    }}
+    .content {{
+      padding: 24px 28px 28px;
+    }}
+    .severity {{
+      background: #ffffff;
+      border: 1px solid {severity["border"]};
+      border-radius: 999px;
+      color: {severity["text"]};
+      display: inline-block;
+      font: 700 12px/1 Arial, Helvetica, sans-serif;
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      text-transform: uppercase;
+    }}
+    .intro {{
+      color: #3c4043;
+      font-size: 16px;
+      margin: 0;
+    }}
+    .grid {{
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(3, 1fr);
+      margin: 0 0 20px;
+    }}
+    .stat {{
+      background: #ffffff;
+      border: 1px solid #e8eaed;
+      border-radius: 12px;
+      padding: 13px 14px;
+    }}
+    .stat-label {{
+      color: #5f6368;
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+    }}
+    .stat-value {{
+      color: #202124;
+      display: block;
+      font-size: 14px;
+      font-weight: 700;
     }}
     .pill {{
       display: inline-block;
       margin: 4px 6px 4px 0;
-      padding: 7px 10px;
+      padding: 8px 11px;
       border-radius: 999px;
-      background: #e5f2ed;
-      border: 1px solid #c8e0d7;
-      color: #074d41;
-      font: 700 12px/1 Verdana, sans-serif;
+      background: #e8f0fe;
+      border: 1px solid #d2e3fc;
+      color: #174ea6;
+      font: 700 12px/1 Arial, Helvetica, sans-serif;
     }}
     .box {{
-      margin: 18px 0;
-      padding: 14px;
-      background: #f7faf8;
-      border: 1px solid #d7e1dc;
-      border-radius: 8px;
+      margin: 0 0 20px;
+      padding: 18px;
+      background: #ffffff;
+      border: 1px solid #e8eaed;
+      border-radius: 12px;
+    }}
+    .action-box {{
+      background: {severity["surface"]};
+      border-color: {severity["border"]};
     }}
     .path {{
-      color: #65716d;
+      color: #5f6368;
       font: 12px/1.4 Consolas, monospace;
       overflow-wrap: anywhere;
+    }}
+    .footer {{
+      border-top: 1px solid #e8eaed;
+      color: #5f6368;
+      font-size: 12px;
+      padding: 16px 28px 22px;
+    }}
+    @media (max-width: 620px) {{
+      .wrapper {{ padding: 0; }}
+      .email {{ border-radius: 0; }}
+      .brand, .hero, .content, .footer {{ padding-left: 18px; padding-right: 18px; }}
+      .grid {{ grid-template-columns: 1fr; }}
+      h1 {{ font-size: 22px; }}
     }}
   </style>
 </head>
 <body>
-  <main class="email">
-    <div class="meta">{escape(notification.date)} | {escape(notification.msa_id)}</div>
-    <h1>{escape(notification.subject)}</h1>
-    <p>Hello {escape(notification.account)} team,</p>
-    <p>We found a Google Cloud MSA notice that appears relevant to services your company uses.</p>
+  <div class="wrapper">
+    <main class="email">
+      <div class="brand">
+        <span class="g g-blue">G</span><span class="g g-red">o</span><span class="g g-yellow">o</span><span class="g g-blue">g</span><span class="g g-green">l</span><span class="g g-red">e</span>
+        <span class="brand-text">Cloud MSA Manager</span>
+      </div>
+      <section class="hero">
+        <span class="severity">{escape(severity["label"])}</span>
+        <div class="meta">{escape(notification.date)} | {escape(notification.msa_id)}</div>
+        <h1>{escape(notification.subject)}</h1>
+        <p class="intro">Hello {escape(notification.account)} team, we found a Google Cloud MSA notice that appears relevant to services your company uses.</p>
+      </section>
+      <section class="content">
+        <div class="grid">
+          <div class="stat">
+            <span class="stat-label">Distribution</span>
+            <span class="stat-value">{distribution_date}</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Effective</span>
+            <span class="stat-value">{effective_date}</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Action</span>
+            <span class="stat-value">{action_required}</span>
+          </div>
+        </div>
 
-    <div class="box">
-      <p><strong>Distribution date:</strong> {distribution_date}</p>
-      <p><strong>Effective date:</strong> {effective_date}</p>
-      <p><strong>Customer action required:</strong> {action_required}</p>
-      <p><strong>Matched services:</strong></p>
-      <div>{services}</div>
-    </div>
+        <div class="box">
+          <h2>Matched services</h2>
+          <div>{services}</div>
+        </div>
 
-    <h2>Summary</h2>
-    <p>{escape(notification.summary)}</p>
+        <div class="box">
+          <h2>Summary</h2>
+          <p>{escape(notification.summary)}</p>
+        </div>
 
-    <h2>Recommended next steps</h2>
-    <ul>{actions}</ul>
+        <div class="box action-box">
+          <h2>Recommended next steps</h2>
+          <ul>{actions}</ul>
+        </div>
 
-    <h2>Source files</h2>
-    <p class="path">Customer profile: {escape(str(notification.customer_raw_path))}</p>
-    <p class="path">MSA notice: {escape(str(notification.raw_msa_path))}</p>
-  </main>
+        <div class="box">
+          <h2>Source files</h2>
+          <p class="path">Customer profile: {escape(str(notification.customer_raw_path))}</p>
+          <p class="path">MSA notice: {escape(str(notification.raw_msa_path))}</p>
+        </div>
+      </section>
+      <footer class="footer">This is a generated preview from MSAi Manager.</footer>
+    </main>
+  </div>
 </body>
 </html>
 """

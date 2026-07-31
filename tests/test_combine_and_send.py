@@ -61,6 +61,122 @@ def queue_record(
 
 
 class CombineAndSendSchedulingTests(unittest.TestCase):
+    def test_email_rendering_includes_googley_severity_treatment(self) -> None:
+        notice = notification(distribution_date="2026-07-20")
+
+        html = combine_and_send.render_html_email(notice)
+        text = combine_and_send.render_text_email(notice)
+
+        self.assertIn("Cloud MSA Manager", html)
+        self.assertIn("Action required", html)
+        self.assertIn("#d93025", html)
+        self.assertIn("class=\"grid\"", html)
+        self.assertIn("Severity: Action required", text)
+
+    def test_queue_loader_uses_canonical_client_columns(self) -> None:
+        captured: dict[str, str] = {}
+
+        def fake_query(query: str, parameters: object) -> list[dict[str, object]]:
+            captured["query"] = query
+            return []
+
+        with (
+            patch.dict(
+                bigquery.os.environ,
+                {
+                    "BQ_PROJECT_ID": "demo-project",
+                    "BQ_DATASET": "msa_manager",
+                    "BQ_QUEUE_DATASET": "msa_dataset",
+                },
+                clear=False,
+            ),
+            patch.object(
+                bigquery,
+                "_queue_column_names",
+                return_value=frozenset(
+                    {"msa_id", "client_id", "update_details", "processed_at", "status"}
+                ),
+            ),
+            patch.object(bigquery, "_query_records", side_effect=fake_query),
+        ):
+            bigquery.load_pending_queue_records(date(2026, 7, 20))
+
+        self.assertIn("`demo-project.msa_dataset.msa_daily_queue`", captured["query"])
+        self.assertIn("TRIM(q.`client_id`) AS client_id", captured["query"])
+        self.assertIn("MAX(q.update_details) AS update_details", captured["query"])
+
+    def test_queue_loader_supports_legacy_customer_columns(self) -> None:
+        captured: dict[str, str] = {}
+
+        def fake_query(query: str, parameters: object) -> list[dict[str, object]]:
+            captured["query"] = query
+            return []
+
+        with (
+            patch.dict(
+                bigquery.os.environ,
+                {
+                    "BQ_PROJECT_ID": "demo-project",
+                    "BQ_DATASET": "msa_manager",
+                    "BQ_QUEUE_DATASET": "msa_manager",
+                },
+                clear=False,
+            ),
+            patch.object(
+                bigquery,
+                "_queue_column_names",
+                return_value=frozenset(
+                    {"msa_id", "customer_id", "details", "processed_at", "status"}
+                ),
+            ),
+            patch.object(bigquery, "_query_records", side_effect=fake_query),
+        ):
+            bigquery.load_pending_queue_records(date(2026, 7, 20))
+
+        self.assertIn("`demo-project.msa_manager.msa_daily_queue`", captured["query"])
+        self.assertIn("TRIM(q.`customer_id`) AS client_id", captured["query"])
+        self.assertIn("MAX(q.details) AS update_details", captured["query"])
+
+    def test_queue_status_updates_use_canonical_client_column(self) -> None:
+        captured: list[str] = []
+
+        def fake_execute(query: str, parameters: object) -> int:
+            captured.append(query)
+            return 1
+
+        with (
+            patch.dict(
+                bigquery.os.environ,
+                {
+                    "BQ_PROJECT_ID": "demo-project",
+                    "BQ_QUEUE_DATASET": "msa_dataset",
+                },
+                clear=False,
+            ),
+            patch.object(
+                bigquery,
+                "_queue_column_names",
+                return_value=frozenset(
+                    {"msa_id", "client_id", "update_details", "processed_at", "status"}
+                ),
+            ),
+            patch.object(bigquery, "_execute_dml", side_effect=fake_execute),
+        ):
+            bigquery.claim_queue_record("msa-demo", "example-project", date(2026, 7, 20))
+            bigquery.mark_queue_record_sent(
+                "msa-demo",
+                "example-project",
+                date(2026, 7, 20),
+            )
+            bigquery.mark_queue_record_failed(
+                "msa-demo",
+                "example-project",
+                date(2026, 7, 20),
+            )
+
+        self.assertEqual(len(captured), 3)
+        self.assertTrue(all("TRIM(q.`client_id`) = @client_id" in query for query in captured))
+
     def test_build_notifications_preserves_distribution_date(self) -> None:
         profile = SimpleNamespace(
             company_id="example_customer",

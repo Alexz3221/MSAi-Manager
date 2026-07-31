@@ -30,7 +30,7 @@ def bigquery_settings() -> tuple[str, str, str, str]:
 
 def queue_settings() -> tuple[str, str, str]:
     project, _, _, _ = bigquery_settings()
-    dataset = _setting("BQ_QUEUE_DATASET", "msa_manager")
+    dataset = _setting("BQ_QUEUE_DATASET", "msa_dataset")
     table = _setting("BQ_DAILY_QUEUE_TABLE", "msa_daily_queue")
     return project, dataset, table
 
@@ -131,6 +131,28 @@ def _queue_available_filter(alias: str) -> str:
     return f"{_queue_status(alias)} IN ('pending', 'queued', 'failed')"
 
 
+@lru_cache(maxsize=None)
+def _queue_column_names(project: str, dataset: str, table: str) -> frozenset[str]:
+    metadata = _client().get_table(f"{project}.{dataset}.{table}")
+    return frozenset(field.name for field in metadata.schema)
+
+
+def _queue_client_column(columns: frozenset[str]) -> str:
+    if "client_id" in columns:
+        return "client_id"
+    if "customer_id" in columns:
+        return "customer_id"
+    raise RuntimeError("msa_daily_queue requires a client_id or customer_id column.")
+
+
+def _queue_details_expression(columns: frozenset[str]) -> str:
+    if "update_details" in columns:
+        return "q.update_details"
+    if "details" in columns:
+        return "q.details"
+    return "CAST(NULL AS STRING)"
+
+
 def load_customer_records() -> list[dict[str, Any]]:
     project, dataset, customer_table, _ = bigquery_settings()
     return _query_records(
@@ -188,14 +210,17 @@ def load_pending_queue_records(as_of: date) -> list[dict[str, Any]]:
     project, msa_dataset, _, msa_table = bigquery_settings()
     _, queue_dataset, queue_table = queue_settings()
     available_filter = _queue_available_filter("q")
+    queue_columns = _queue_column_names(project, queue_dataset, queue_table)
+    client_column = _queue_client_column(queue_columns)
+    details_expression = _queue_details_expression(queue_columns)
 
     return _query_records(
         f"""
         WITH pending_queue AS (
           SELECT
             TRIM(q.msa_id) AS msa_id,
-            TRIM(q.customer_id) AS client_id,
-            MAX(q.details) AS update_details,
+            TRIM(q.`{client_column}`) AS client_id,
+            MAX({details_expression}) AS update_details,
             MIN(q.processed_at) AS processed_at
           FROM `{project}.{queue_dataset}.{queue_table}` AS q
           WHERE DATE(q.processed_at) <= @as_of
@@ -265,6 +290,8 @@ def claim_queue_record(
     """Claim an eligible delivery from the scheduled-query queue."""
     project, queue_dataset, queue_table = queue_settings()
     available_filter = _queue_available_filter("q")
+    queue_columns = _queue_column_names(project, queue_dataset, queue_table)
+    client_column = _queue_client_column(queue_columns)
 
     return _execute_dml(
         f"""
@@ -272,7 +299,7 @@ def claim_queue_record(
         SET status = 'processing'
         WHERE DATE(q.processed_at) <= @as_of
           AND TRIM(q.msa_id) = @msa_id
-          AND TRIM(q.customer_id) = @client_id
+          AND TRIM(q.`{client_column}`) = @client_id
           AND {available_filter}
         """,
         [
@@ -290,6 +317,8 @@ def mark_queue_record_sent(
 ) -> int:
     """Mark claimed duplicates for one delivery as sent after SMTP succeeds."""
     project, queue_dataset, queue_table = queue_settings()
+    queue_columns = _queue_column_names(project, queue_dataset, queue_table)
+    client_column = _queue_client_column(queue_columns)
 
     return _execute_dml(
         f"""
@@ -297,7 +326,7 @@ def mark_queue_record_sent(
         SET status = 'sent'
         WHERE DATE(q.processed_at) <= @as_of
           AND TRIM(q.msa_id) = @msa_id
-          AND TRIM(q.customer_id) = @client_id
+          AND TRIM(q.`{client_column}`) = @client_id
           AND LOWER(TRIM(q.status)) = 'processing'
         """,
         [
@@ -315,6 +344,8 @@ def mark_queue_record_failed(
 ) -> int:
     """Release a claimed delivery for retry after an SMTP failure."""
     project, queue_dataset, queue_table = queue_settings()
+    queue_columns = _queue_column_names(project, queue_dataset, queue_table)
+    client_column = _queue_client_column(queue_columns)
 
     return _execute_dml(
         f"""
@@ -322,7 +353,7 @@ def mark_queue_record_failed(
         SET status = 'failed'
         WHERE DATE(q.processed_at) <= @as_of
           AND TRIM(q.msa_id) = @msa_id
-          AND TRIM(q.customer_id) = @client_id
+          AND TRIM(q.`{client_column}`) = @client_id
           AND LOWER(TRIM(q.status)) = 'processing'
         """,
         [
