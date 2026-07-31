@@ -23,7 +23,7 @@ Primary BigQuery tables:
 ```text
 sprinternship-bld-2026.msa_manager.customer_profiles
 sprinternship-bld-2026.msa_manager.msa_updates
-sprinternship-bld-2026.msa_manager.msa_daily_queue
+sprinternship-bld-2026.msa_dataset.msa_daily_queue
 ```
 
 ## Data Pipeline
@@ -49,12 +49,10 @@ raw MSA text in Cloud Storage
 ```
 
 The browser feed and John both match `customer_profiles` directly against
-`msa_updates`. The BigQuery scheduled query `msa_daily_queue_append` appends due
-deliveries from `msa_manager.v_msa_daily_queue` into
-`msa_manager.msa_daily_queue` at 00:00 UTC. Cloud Scheduler runs
-`msai-manager-combine-and-send` at 18:00 UTC with `--send --consume-queue`.
-The older `msa_daily_queue_append_canonical` scheduled query still exists, but
-is disabled and is not used by the app.
+`msa_updates`. The BigQuery scheduled query `msa_daily_queue_append_canonical`
+appends service-matched deliveries into `msa_dataset.msa_daily_queue`.
+Cloud Scheduler runs `msai-manager-combine-and-send` at 18:00 UTC with
+`--send --consume-queue`.
 
 ## Demo Auth
 
@@ -136,7 +134,7 @@ BQ_DATASET=msa_manager
 BQ_CUSTOMERS_TABLE=customer_profiles
 BQ_CUSTOMERS_STAGING_TABLE=customer_profiles_staging
 BQ_MSA_UPDATES_TABLE=msa_updates
-BQ_QUEUE_DATASET=msa_manager
+BQ_QUEUE_DATASET=msa_dataset
 BQ_DAILY_QUEUE_TABLE=msa_daily_queue
 MSA_DATA_BUCKET=
 CUSTOMER_DATA_BUCKET=

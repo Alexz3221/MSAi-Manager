@@ -85,21 +85,28 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
             "BQ_PROJECT_ID": "test-project",
             "BQ_DATASET": "msa_manager",
             "BQ_MSA_UPDATES_TABLE": "msa_updates",
-            "BQ_QUEUE_DATASET": "msa_manager",
+            "BQ_QUEUE_DATASET": "msa_dataset",
             "BQ_DAILY_QUEUE_TABLE": "msa_daily_queue",
         }
 
         with (
             patch.dict(os.environ, settings, clear=False),
+            patch.object(
+                bigquery,
+                "_queue_column_names",
+                return_value=frozenset(
+                    {"msa_id", "client_id", "update_details", "processed_at", "status"}
+                ),
+            ),
             patch.object(bigquery, "_query_records", return_value=[]) as query,
         ):
             self.assertEqual(bigquery.load_pending_queue_records(as_of), [])
 
         sql, parameters = query.call_args.args
-        self.assertIn("`test-project.msa_manager.msa_daily_queue`", sql)
+        self.assertIn("`test-project.msa_dataset.msa_daily_queue`", sql)
         self.assertIn("`test-project.msa_manager.msa_updates`", sql)
-        self.assertIn("TRIM(q.customer_id) AS client_id", sql)
-        self.assertIn("MAX(q.details) AS update_details", sql)
+        self.assertIn("TRIM(q.`client_id`) AS client_id", sql)
+        self.assertIn("MAX(q.update_details) AS update_details", sql)
         self.assertIn("DATE(q.processed_at) <= @as_of", sql)
         self.assertIn("GROUP BY msa_id, client_id", sql)
         self.assertIn("LEFT JOIN latest_msa_updates", sql)
@@ -113,12 +120,19 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
         settings = {
             "BQ_PROJECT_ID": "test-project",
             "BQ_DATASET": "msa_manager",
-            "BQ_QUEUE_DATASET": "msa_manager",
+            "BQ_QUEUE_DATASET": "msa_dataset",
             "BQ_DAILY_QUEUE_TABLE": "msa_daily_queue",
         }
 
         with (
             patch.dict(os.environ, settings, clear=False),
+            patch.object(
+                bigquery,
+                "_queue_column_names",
+                return_value=frozenset(
+                    {"msa_id", "client_id", "update_details", "processed_at", "status"}
+                ),
+            ),
             patch.object(bigquery, "_execute_dml", return_value=2) as execute,
         ):
             affected = bigquery.mark_queue_record_sent(
@@ -133,7 +147,7 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
         self.assertNotIn("SET processed_at", sql)
         self.assertIn("DATE(q.processed_at) <= @as_of", sql)
         self.assertIn("TRIM(q.msa_id) = @msa_id", sql)
-        self.assertIn("TRIM(q.customer_id) = @client_id", sql)
+        self.assertIn("TRIM(q.`client_id`) = @client_id", sql)
         self.assertEqual(
             parameters,
             [
@@ -148,12 +162,19 @@ class BigQueryCustomerQueryTests(unittest.TestCase):
         settings = {
             "BQ_PROJECT_ID": "test-project",
             "BQ_DATASET": "msa_manager",
-            "BQ_QUEUE_DATASET": "msa_manager",
+            "BQ_QUEUE_DATASET": "msa_dataset",
             "BQ_DAILY_QUEUE_TABLE": "msa_daily_queue",
         }
 
         with (
             patch.dict(os.environ, settings, clear=False),
+            patch.object(
+                bigquery,
+                "_queue_column_names",
+                return_value=frozenset(
+                    {"msa_id", "client_id", "update_details", "processed_at", "status"}
+                ),
+            ),
             patch.object(bigquery, "_execute_dml", return_value=1) as execute,
         ):
             claimed = bigquery.claim_queue_record(
