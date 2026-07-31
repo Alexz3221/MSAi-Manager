@@ -366,14 +366,15 @@ def render_html_email(notification: Notification) -> str:
       font-family: Arial, Helvetica, sans-serif;
     }}
     .wrapper {{
-      padding: 28px 12px;
+      padding: 16px 10px;
     }}
     .email {{
+      width: 100%;
       max-width: 720px;
       margin: 0 auto;
       background: #ffffff;
       border: 1px solid #dadce0;
-      border-radius: 16px;
+      border-radius: 8px;
       box-shadow: 0 1px 2px rgba(60, 64, 67, 0.16);
       overflow: hidden;
     }}
@@ -381,11 +382,11 @@ def render_html_email(notification: Notification) -> str:
       align-items: center;
       border-bottom: 1px solid #e8eaed;
       display: flex;
-      gap: 10px;
-      padding: 18px 24px;
+      gap: 8px;
+      padding: 12px 20px;
     }}
     .g {{
-      font: 700 22px/1 Arial, Helvetica, sans-serif;
+      font: 700 20px/1 Arial, Helvetica, sans-serif;
       letter-spacing: 0;
     }}
     .g-blue {{ color: #4285f4; }}
@@ -394,44 +395,44 @@ def render_html_email(notification: Notification) -> str:
     .g-green {{ color: #34a853; }}
     .brand-text {{
       color: #3c4043;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
     }}
     .hero {{
       background: {severity["surface"]};
-      border-left: 8px solid {severity["accent"]};
-      padding: 26px 28px 24px;
+      border-left: 6px solid {severity["accent"]};
+      padding: 16px 20px 15px;
     }}
     .meta {{
       color: #5f6368;
-      font: 700 12px/1.3 Arial, Helvetica, sans-serif;
+      font: 700 10px/1.3 Arial, Helvetica, sans-serif;
       text-transform: uppercase;
     }}
     h1 {{
       color: #202124;
-      font-size: 26px;
+      font-size: 22px;
       line-height: 1.25;
-      margin: 12px 0 14px;
+      margin: 8px 0;
     }}
     h2 {{
       color: #202124;
-      font-size: 16px;
+      font-size: 14px;
       line-height: 1.3;
-      margin: 0 0 10px;
+      margin: 0 0 5px;
     }}
     p, li {{
-      font-size: 15px;
-      line-height: 1.6;
+      font-size: 14px;
+      line-height: 1.45;
     }}
     p {{
-      margin: 0 0 12px;
+      margin: 0 0 8px;
     }}
     ul {{
       margin: 0;
-      padding-left: 20px;
+      padding-left: 18px;
     }}
     .content {{
-      padding: 24px 28px 28px;
+      padding: 14px 20px 16px;
     }}
     .severity {{
       background: #ffffff;
@@ -439,58 +440,81 @@ def render_html_email(notification: Notification) -> str:
       border-radius: 999px;
       color: {severity["text"]};
       display: inline-block;
-      font: 700 12px/1 Arial, Helvetica, sans-serif;
-      margin-bottom: 10px;
-      padding: 8px 12px;
+      font: 700 10px/1 Arial, Helvetica, sans-serif;
+      margin-bottom: 7px;
+      padding: 6px 9px;
       text-transform: uppercase;
     }}
     .intro {{
       color: #3c4043;
-      font-size: 16px;
+      font-size: 14px;
       margin: 0;
     }}
-    .grid {{
-      display: grid;
-      gap: 12px;
-      grid-template-columns: repeat(3, 1fr);
-      margin: 0 0 20px;
-    }}
-    .stat {{
+    .stats {{
+      width: 100%;
+      margin: 0 0 10px;
       background: #ffffff;
       border: 1px solid #e8eaed;
-      border-radius: 12px;
-      padding: 13px 14px;
+      border-collapse: separate;
+      border-radius: 8px;
+      border-spacing: 0;
+      table-layout: fixed;
+    }}
+    .stat {{
+      width: 33.33%;
+      padding: 9px 12px;
+      border-right: 1px solid #e8eaed;
+      vertical-align: top;
+    }}
+    .stat:last-child {{
+      border-right: 0;
     }}
     .stat-label {{
       color: #5f6368;
       display: block;
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 700;
-      margin-bottom: 5px;
+      margin-bottom: 3px;
       text-transform: uppercase;
     }}
     .stat-value {{
       color: #202124;
       display: block;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
     }}
     .pill {{
       display: inline-block;
-      margin: 4px 6px 4px 0;
-      padding: 8px 11px;
+      margin: 0 5px 0 0;
+      padding: 5px 8px;
       border-radius: 999px;
       background: #e8f0fe;
       border: 1px solid #d2e3fc;
       color: #174ea6;
-      font: 700 12px/1 Arial, Helvetica, sans-serif;
+      font: 700 11px/1 Arial, Helvetica, sans-serif;
     }}
     .box {{
-      margin: 0 0 20px;
-      padding: 18px;
+      margin: 0 0 10px;
+      padding: 11px 13px;
       background: #ffffff;
       border: 1px solid #e8eaed;
-      border-radius: 12px;
+      border-radius: 8px;
+    }}
+    .service-row {{
+      width: 100%;
+      border-collapse: collapse;
+    }}
+    .service-label {{
+      width: 125px;
+      padding: 0 10px 0 0;
+      vertical-align: middle;
+    }}
+    .service-label h2 {{
+      margin: 0;
+    }}
+    .service-values {{
+      padding: 0;
+      vertical-align: middle;
     }}
     .action-box {{
       background: {severity["surface"]};
@@ -499,20 +523,24 @@ def render_html_email(notification: Notification) -> str:
     .path {{
       color: #5f6368;
       font: 12px/1.4 Consolas, monospace;
+      margin: 0 0 3px;
       overflow-wrap: anywhere;
+    }}
+    .path:last-child {{
+      margin-bottom: 0;
     }}
     .footer {{
       border-top: 1px solid #e8eaed;
       color: #5f6368;
-      font-size: 12px;
-      padding: 16px 28px 22px;
+      font-size: 11px;
+      padding: 10px 20px 12px;
     }}
     @media (max-width: 620px) {{
       .wrapper {{ padding: 0; }}
       .email {{ border-radius: 0; }}
-      .brand, .hero, .content, .footer {{ padding-left: 18px; padding-right: 18px; }}
-      .grid {{ grid-template-columns: 1fr; }}
-      h1 {{ font-size: 22px; }}
+      .brand, .hero, .content, .footer {{ padding-left: 14px; padding-right: 14px; }}
+      h1 {{ font-size: 20px; }}
+      .stat {{ padding-left: 8px; padding-right: 8px; }}
     }}
   </style>
 </head>
@@ -530,24 +558,30 @@ def render_html_email(notification: Notification) -> str:
         <p class="intro">Hello {escape(notification.account)} team, we found a Google Cloud MSA notice that appears relevant to services your company uses.</p>
       </section>
       <section class="content">
-        <div class="grid">
-          <div class="stat">
+        <table class="stats" role="presentation" cellspacing="0" cellpadding="0">
+          <tr>
+          <td class="stat">
             <span class="stat-label">Distribution</span>
             <span class="stat-value">{distribution_date}</span>
-          </div>
-          <div class="stat">
+          </td>
+          <td class="stat">
             <span class="stat-label">Effective</span>
             <span class="stat-value">{effective_date}</span>
-          </div>
-          <div class="stat">
+          </td>
+          <td class="stat">
             <span class="stat-label">Action</span>
             <span class="stat-value">{action_required}</span>
-          </div>
-        </div>
+          </td>
+          </tr>
+        </table>
 
         <div class="box">
-          <h2>Matched services</h2>
-          <div>{services}</div>
+          <table class="service-row" role="presentation" cellspacing="0" cellpadding="0">
+            <tr>
+              <td class="service-label"><h2>Matched services</h2></td>
+              <td class="service-values">{services}</td>
+            </tr>
+          </table>
         </div>
 
         <div class="box">

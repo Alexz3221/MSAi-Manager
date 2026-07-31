@@ -70,7 +70,9 @@ class CombineAndSendSchedulingTests(unittest.TestCase):
         self.assertIn("Cloud MSA Manager", html)
         self.assertIn("Action required", html)
         self.assertIn("#d93025", html)
-        self.assertIn("class=\"grid\"", html)
+        self.assertIn("class=\"stats\"", html)
+        self.assertIn("class=\"service-row\"", html)
+        self.assertNotIn("class=\"grid\"", html)
         self.assertIn("Severity: Action required", text)
 
     def test_queue_loader_uses_canonical_client_columns(self) -> None:
